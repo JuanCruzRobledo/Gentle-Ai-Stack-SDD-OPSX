@@ -20,7 +20,8 @@ curl -fsSL https://raw.githubusercontent.com/JuanCruzRobledo/Gentle-Ai-Stack-SDD
 irm https://raw.githubusercontent.com/JuanCruzRobledo/Gentle-Ai-Stack-SDD-OPSX/main/scripts/install-opsx.ps1 | iex
 ```
 
-> **Requisito:** Go 1.24+ ([descargar](https://go.dev/dl/)). El script clona, compila, limpia config Legacy si existe, y sincroniza automaticamente.
+> **Requisito previo:** tener [gentle-ai](https://github.com/Gentleman-Programming/gentle-ai) instalado y sincronizado.
+> El script solo necesita **git** (no Go). Descarga los archivos OPSX y los aplica como parche sobre la instalacion existente.
 
 ---
 
@@ -56,103 +57,45 @@ internal/assets/
 
 ---
 
-## Instalacion manual
+## Como funciona
 
-Si preferis hacerlo paso a paso en vez del Quick Start:
+El script de Quick Start funciona como un **parche** sobre el stack original:
 
-### Pre-requisitos
+1. **Prerequisito**: Tenes [gentle-ai](https://github.com/Gentleman-Programming/gentle-ai) instalado y sincronizado
+2. **El script**: Clona este fork, copia los archivos OPSX encima de los Legacy, y limpia los comandos viejos
+3. **Resultado**: Tus agentes ahora usan OPSX en vez de SDD Legacy
 
-- **Go 1.24+** instalado ([descargar](https://go.dev/dl/))
-- **git** instalado
+**No compila nada, no corre `gentle-ai sync`, no depende de Go.** Solo necesita `git`.
 
-Verifica Go:
+### Que parchea exactamente
 
-```bash
-go version
-```
+| Componente | Que hace |
+|-----------|----------|
+| **Skills** (`sdd-*/SKILL.md`) | Reemplaza el contenido con instrucciones OPSX que usan `openspec` CLI |
+| **Orchestrators** | Reemplaza la seccion `sdd-orchestrator` en cada agente con instrucciones OPSX |
+| **Commands** (OpenCode) | Borra los `sdd-*.md` y agrega `opsx-*.md` |
 
-### 1. Clonar o descargar este repositorio
+### Instalacion manual (sin script)
 
-```bash
-git clone https://github.com/JuanCruzRobledo/Gentle-Ai-Stack-SDD-OPSX.git
-cd Gentle-Ai-Stack-SDD-OPSX
-```
-
-### 2. Limpiar la configuracion anterior (solo si tenes el stack original)
-
-Si ya tenias el stack original instalado, **es necesario limpiar la configuracion anterior** antes de sincronizar. El sync hace un merge (no un reemplazo), asi que los comandos y agentes del flujo Legacy persisten y generan conflictos con OPSX.
-
-**Linux / macOS (OpenCode):**
+Si preferis hacerlo a mano, clona este repo y copia los archivos:
 
 ```bash
-rm -rf ~/.config/opencode/commands/sdd-*.md
-rm -f ~/.config/opencode/opencode.json
+git clone --depth 1 https://github.com/JuanCruzRobledo/Gentle-Ai-Stack-SDD-OPSX.git /tmp/opsx-patch
+
+# Copiar skills (ejemplo para Claude Code, repeti para cada agente)
+cp /tmp/opsx-patch/internal/assets/skills/sdd-*/SKILL.md ~/.claude/skills/sdd-*/SKILL.md
+
+# Limpiar
+rm -rf /tmp/opsx-patch
 ```
 
-**Linux / macOS (otras herramientas):**
-
-```bash
-# Claude Code
-rm -rf ~/.claude/commands/sdd-*.md
-
-# Cursor
-rm -rf ~/.cursor/agents/sdd-*.md
-
-# Gemini CLI
-rm -rf ~/.gemini/commands/sdd-*.md
-```
-
-**Windows (PowerShell):**
-
-```powershell
-# OpenCode
-Remove-Item "$HOME\.config\opencode\commands\sdd-*.md" -ErrorAction SilentlyContinue
-Remove-Item "$HOME\.config\opencode\opencode.json" -ErrorAction SilentlyContinue
-
-# Claude Code
-Remove-Item "$HOME\.claude\commands\sdd-*.md" -ErrorAction SilentlyContinue
-
-# Cursor
-Remove-Item "$HOME\.cursor\agents\sdd-*.md" -ErrorAction SilentlyContinue
-```
-
-> **Por que es necesario?** El sync del stack original instala comandos `sdd-*.md` y agentes con instrucciones Legacy. El sync de este fork agrega los nuevos `opsx-*` pero NO borra los viejos. La herramienta ve ambos sets de comandos y el orchestrator puede caer en el comportamiento Legacy.
-
-### 3. Compilar
-
-**Windows:**
-
-```bash
-go build -o gentle-ai.exe ./cmd/gentle-ai/
-```
-
-**Linux / macOS:**
-
-```bash
-go build -o gentle-ai ./cmd/gentle-ai/
-```
-
-### 4. Sincronizar
-
-**Windows:**
-
-```bash
-./gentle-ai.exe sync
-```
-
-**Linux / macOS:**
-
-```bash
-./gentle-ai sync
-```
-
-Si la terminal muestra el mensaje de exito, tu entorno esta actualizado con OPSX.
+Para el orchestrator, edita manualmente el archivo de sistema de tu agente y reemplaza el contenido entre `<!-- gentle-ai:sdd-orchestrator -->` y `<!-- /gentle-ai:sdd-orchestrator -->`.
 
 ---
 
 ## Verificacion
 
-Abri OpenCode en cualquier proyecto y preguntale al agente:
+Reinicia tu agente de IA y preguntale:
 
 ```
 Quien sos y que podes hacer? Explicame tu flujo de trabajo completo.

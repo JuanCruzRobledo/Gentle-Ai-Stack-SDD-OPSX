@@ -2,18 +2,22 @@
 set -euo pipefail
 
 # ============================================================================
-# gentle-ai OPSX — Install Script
-# One command to install the OPSX-enhanced Gentle AI Stack.
+# gentle-ai OPSX — Patch Script
+# Applies OPSX workflow on top of an existing gentle-ai installation.
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/JuanCruzRobledo/Gentle-Ai-Stack-SDD-OPSX/main/scripts/install-opsx.sh | bash
 #
-# Requires: Go 1.24+, git, curl
+# Requires: git (NO Go required)
+# Pre-requisite: gentle-ai must be already installed and synced
 # ============================================================================
 
 GITHUB_OWNER="JuanCruzRobledo"
 GITHUB_REPO="Gentle-Ai-Stack-SDD-OPSX"
-BINARY_NAME="gentle-ai"
+HOME_DIR="$HOME"
+
+# Skills to patch (directory names in internal/assets/skills/)
+SKILLS=(sdd-init sdd-apply sdd-verify sdd-explore sdd-propose sdd-spec sdd-design sdd-tasks sdd-archive sdd-onboard)
 
 # ============================================================================
 # Color support
@@ -21,14 +25,9 @@ BINARY_NAME="gentle-ai"
 
 setup_colors() {
     if [ -t 1 ] && [ "${TERM:-}" != "dumb" ]; then
-        RED='\033[0;31m'
-        GREEN='\033[0;32m'
-        YELLOW='\033[1;33m'
-        BLUE='\033[0;34m'
-        CYAN='\033[0;36m'
-        BOLD='\033[1m'
-        DIM='\033[2m'
-        NC='\033[0m'
+        RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+        BLUE='\033[0;34m'; CYAN='\033[0;36m'; BOLD='\033[1m'
+        DIM='\033[2m'; NC='\033[0m'
     else
         RED='' GREEN='' YELLOW='' BLUE='' CYAN='' BOLD='' DIM='' NC=''
     fi
@@ -37,13 +36,8 @@ setup_colors() {
 info()    { echo -e "${BLUE}[info]${NC}    $*"; }
 success() { echo -e "${GREEN}[ok]${NC}      $*"; }
 warn()    { echo -e "${YELLOW}[warn]${NC}    $*"; }
-error()   { echo -e "${RED}[error]${NC}   $*" >&2; }
-fatal()   { error "$@"; exit 1; }
+fatal()   { echo -e "${RED}[error]${NC}   $*" >&2; exit 1; }
 step()    { echo -e "\n${CYAN}${BOLD}==>${NC} ${BOLD}$*${NC}"; }
-
-# ============================================================================
-# Banner
-# ============================================================================
 
 print_banner() {
     echo ""
@@ -54,7 +48,7 @@ print_banner() {
     echo " | |_| |  __/ | | | |_| |  __/_____/ ___ \ | | "
     echo "  \____|\___|_| |_|\__|_|\___|    /_/   \_\___|"
     echo -e "${NC}"
-    echo -e "  ${DIM}OPSX Edition — Fluid workflow powered by OpenSpec CLI${NC}"
+    echo -e "  ${DIM}OPSX Patch — Fluid workflow powered by OpenSpec CLI${NC}"
     echo ""
 }
 
@@ -65,176 +59,273 @@ print_banner() {
 check_prerequisites() {
     step "Checking prerequisites"
 
-    local missing=()
-
     if ! command -v git &>/dev/null; then
-        missing+=("git")
+        fatal "git is required. Install it and try again."
     fi
 
-    if ! command -v go &>/dev/null; then
-        missing+=("go (https://go.dev/dl/)")
+    # Check that at least one agent is configured
+    local found=false
+    for dir in "$HOME_DIR/.claude" "$HOME_DIR/.config/opencode" "$HOME_DIR/.cursor" "$HOME_DIR/.gemini" "$HOME_DIR/.codex" "$HOME_DIR/.codeium/windsurf"; do
+        if [ -d "$dir" ]; then
+            found=true
+            break
+        fi
+    done
+
+    if [ "$found" = false ]; then
+        fatal "No AI agent configuration found. Install gentle-ai first: https://github.com/Gentleman-Programming/gentle-ai"
     fi
 
-    if [ ${#missing[@]} -gt 0 ]; then
-        fatal "Missing required tools: ${missing[*]}. Please install them and try again."
-    fi
-
-    # Check Go version >= 1.24
-    local go_version
-    go_version="$(go version | grep -oP 'go\K[0-9]+\.[0-9]+')"
-    local go_major go_minor
-    go_major="$(echo "$go_version" | cut -d. -f1)"
-    go_minor="$(echo "$go_version" | cut -d. -f2)"
-
-    if [ "$go_major" -lt 1 ] || { [ "$go_major" -eq 1 ] && [ "$go_minor" -lt 24 ]; }; then
-        fatal "Go 1.24+ required, found go${go_version}. Update from https://go.dev/dl/"
-    fi
-
-    success "git and Go ${go_version} are available"
+    success "Prerequisites OK"
 }
 
 # ============================================================================
-# Clean legacy config
+# Clone fork
+# ============================================================================
+
+clone_fork() {
+    step "Downloading OPSX patch files"
+
+    TMPDIR="$(mktemp -d)"
+    trap '[ -n "${TMPDIR:-}" ] && rm -rf "$TMPDIR"' EXIT
+
+    git clone --depth 1 "https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}.git" "$TMPDIR/repo" 2>&1 | tail -1
+    ASSETS="$TMPDIR/repo/internal/assets"
+    success "Downloaded"
+}
+
+# ============================================================================
+# Clean legacy commands
 # ============================================================================
 
 clean_legacy() {
-    step "Cleaning legacy SDD config (if present)"
+    step "Cleaning legacy SDD commands"
 
     local cleaned=false
 
-    # OpenCode
-    if ls ~/.config/opencode/commands/sdd-*.md &>/dev/null 2>&1; then
-        rm -f ~/.config/opencode/commands/sdd-*.md
-        cleaned=true
-    fi
-    if [ -f ~/.config/opencode/opencode.json ]; then
-        rm -f ~/.config/opencode/opencode.json
+    # OpenCode commands
+    if ls "$HOME_DIR/.config/opencode/commands/sdd-"*.md &>/dev/null 2>&1; then
+        rm -f "$HOME_DIR/.config/opencode/commands/sdd-"*.md
         cleaned=true
     fi
 
-    # Claude Code
-    if ls ~/.claude/commands/sdd-*.md &>/dev/null 2>&1; then
-        rm -f ~/.claude/commands/sdd-*.md
-        cleaned=true
-    fi
-
-    # Cursor
-    if ls ~/.cursor/agents/sdd-*.md &>/dev/null 2>&1; then
-        rm -f ~/.cursor/agents/sdd-*.md
-        cleaned=true
-    fi
-
-    # Gemini
-    if ls ~/.gemini/commands/sdd-*.md &>/dev/null 2>&1; then
-        rm -f ~/.gemini/commands/sdd-*.md
+    # OpenCode JSON (will be regenerated by next official sync, but orchestrator will be patched)
+    if [ -f "$HOME_DIR/.config/opencode/opencode.json" ]; then
+        rm -f "$HOME_DIR/.config/opencode/opencode.json"
         cleaned=true
     fi
 
     if [ "$cleaned" = true ]; then
-        success "Legacy SDD config removed"
+        success "Legacy commands removed"
     else
-        success "No legacy config found — clean install"
+        success "No legacy commands found"
     fi
 }
 
 # ============================================================================
-# Clone, build, install
+# Patch skills (shared across all agents)
 # ============================================================================
 
-install_from_source() {
-    step "Cloning repository"
+patch_skills() {
+    step "Patching skills to OPSX"
 
-    local tmpdir
-    tmpdir="$(mktemp -d)"
-    trap '[ -n "${tmpdir:-}" ] && rm -rf "$tmpdir"' EXIT
+    local skill_dirs=(
+        "$HOME_DIR/.claude/skills"
+        "$HOME_DIR/.config/opencode/skills"
+        "$HOME_DIR/.cursor/skills"
+        "$HOME_DIR/.gemini/skills"
+        "$HOME_DIR/.codex/skills"
+        "$HOME_DIR/.codeium/windsurf/skills"
+        "$HOME_DIR/.gemini/antigravity/skills"
+    )
 
-    git clone --depth 1 "https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}.git" "$tmpdir/repo"
-    success "Repository cloned"
+    local patched=0
 
-    step "Building ${BINARY_NAME}"
+    for skill_dir in "${skill_dirs[@]}"; do
+        if [ ! -d "$skill_dir" ]; then
+            continue
+        fi
 
-    cd "$tmpdir/repo"
-    go build -o "${BINARY_NAME}" ./cmd/gentle-ai/
-    success "Build complete"
+        for skill in "${SKILLS[@]}"; do
+            local target="$skill_dir/$skill/SKILL.md"
+            local source="$ASSETS/skills/$skill/SKILL.md"
 
-    step "Installing binary"
+            if [ -f "$target" ] && [ -f "$source" ]; then
+                cp "$source" "$target"
+                patched=$((patched + 1))
+            fi
+        done
+    done
 
-    local install_dir
-    if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
-        install_dir="/usr/local/bin"
-    else
-        install_dir="${HOME}/.local/bin"
-        mkdir -p "$install_dir"
+    success "Patched $patched skill files"
+}
+
+# ============================================================================
+# Patch Claude Code orchestrator (markdown sections)
+# ============================================================================
+
+patch_claude() {
+    local claude_md="$HOME_DIR/.claude/CLAUDE.md"
+
+    if [ ! -f "$claude_md" ]; then
+        return
     fi
 
-    if cp "${BINARY_NAME}" "${install_dir}/${BINARY_NAME}" 2>/dev/null; then
-        chmod +x "${install_dir}/${BINARY_NAME}"
-    elif command -v sudo &>/dev/null; then
-        warn "Permission denied. Trying with sudo..."
-        sudo cp "${BINARY_NAME}" "${install_dir}/${BINARY_NAME}"
-        sudo chmod +x "${install_dir}/${BINARY_NAME}"
+    step "Patching Claude Code orchestrator"
+
+    local opsx_content
+    opsx_content="$(cat "$ASSETS/claude/sdd-orchestrator.md")"
+
+    local open_marker="<!-- gentle-ai:sdd-orchestrator -->"
+    local close_marker="<!-- /gentle-ai:sdd-orchestrator -->"
+
+    if grep -q "$open_marker" "$claude_md"; then
+        # Replace content between markers
+        local tmpfile="$TMPDIR/claude_md_patched"
+
+        awk -v open="$open_marker" -v close="$close_marker" -v content="$opsx_content" '
+        BEGIN { skip=0; printed=0 }
+        $0 == open {
+            print $0
+            print content
+            skip=1
+            printed=1
+            next
+        }
+        $0 == close {
+            print $0
+            skip=0
+            next
+        }
+        skip==0 { print }
+        ' "$claude_md" > "$tmpfile"
+
+        cp "$tmpfile" "$claude_md"
+        success "Claude Code orchestrator updated (replaced section)"
     else
-        fatal "Cannot write to ${install_dir}. Run with sudo or install Go and use 'go build' manually."
-    fi
-
-    success "Installed ${BINARY_NAME} to ${install_dir}/${BINARY_NAME}"
-
-    if [[ ":$PATH:" != *":${install_dir}:"* ]]; then
-        warn "${install_dir} is not in your PATH"
-        echo -e "  ${DIM}Add to your shell profile: export PATH=\"\$PATH:${install_dir}\"${NC}"
-        export PATH="$PATH:${install_dir}"
+        # Append new section
+        {
+            echo ""
+            echo "$open_marker"
+            echo "$opsx_content"
+            echo "$close_marker"
+        } >> "$claude_md"
+        success "Claude Code orchestrator added (new section)"
     fi
 }
 
 # ============================================================================
-# Run sync
+# Patch agents using FileReplace/AppendToFile strategy
 # ============================================================================
 
-run_sync() {
-    step "Running ${BINARY_NAME} sync"
+patch_file_agents() {
+    # agent_name -> (system_prompt_file, orchestrator_asset, strategy)
+    local -A agents=(
+        ["opencode"]="$HOME_DIR/.config/opencode/AGENTS.md|generic/sdd-orchestrator.md|replace"
+        ["cursor"]="$HOME_DIR/.cursor/rules/gentle-ai.mdc|cursor/sdd-orchestrator.md|replace"
+        ["gemini"]="$HOME_DIR/.gemini/GEMINI.md|gemini/sdd-orchestrator.md|replace"
+        ["codex"]="$HOME_DIR/.codex/agents.md|codex/sdd-orchestrator.md|replace"
+        ["windsurf"]="$HOME_DIR/.codeium/windsurf/memories/global_rules.md|windsurf/sdd-orchestrator.md|append"
+    )
 
-    if command -v "$BINARY_NAME" &>/dev/null; then
-        "$BINARY_NAME" sync
-        success "Sync complete — OPSX workflow is active"
-    else
-        warn "Binary not in PATH. Run '${BINARY_NAME} sync' manually after adding it."
-    fi
+    for agent in "${!agents[@]}"; do
+        IFS='|' read -r prompt_file asset_path strategy <<< "${agents[$agent]}"
+
+        if [ ! -f "$prompt_file" ]; then
+            continue
+        fi
+
+        local opsx_content
+        opsx_content="$(cat "$ASSETS/$asset_path")"
+
+        local open_marker="<!-- gentle-ai:sdd-orchestrator -->"
+        local close_marker="<!-- /gentle-ai:sdd-orchestrator -->"
+
+        if grep -q "$open_marker" "$prompt_file"; then
+            # Replace between markers
+            local tmpfile="$TMPDIR/${agent}_patched"
+
+            awk -v open="$open_marker" -v close="$close_marker" -v content="$opsx_content" '
+            BEGIN { skip=0 }
+            $0 == open {
+                print $0
+                print content
+                skip=1
+                next
+            }
+            $0 == close {
+                print $0
+                skip=0
+                next
+            }
+            skip==0 { print }
+            ' "$prompt_file" > "$tmpfile"
+
+            cp "$tmpfile" "$prompt_file"
+            info "  $agent: orchestrator replaced"
+        elif [ "$strategy" = "append" ]; then
+            {
+                echo ""
+                echo "$open_marker"
+                echo "$opsx_content"
+                echo "$close_marker"
+            } >> "$prompt_file"
+            info "  $agent: orchestrator appended"
+        else
+            {
+                echo "$open_marker"
+                echo "$opsx_content"
+                echo "$close_marker"
+            } > "$prompt_file"
+            info "  $agent: orchestrator written"
+        fi
+    done
 }
 
 # ============================================================================
-# Verify
+# Patch OpenCode commands
 # ============================================================================
 
-verify_installation() {
-    step "Verifying installation"
+patch_opencode_commands() {
+    local commands_dir="$HOME_DIR/.config/opencode/commands"
 
-    hash -r 2>/dev/null || true
-
-    if command -v "$BINARY_NAME" &>/dev/null; then
-        local version_output
-        version_output="$("$BINARY_NAME" version 2>&1 || true)"
-        success "${BINARY_NAME} is installed: ${version_output}"
-    else
-        warn "Could not verify installation. Restart your shell and run: ${BINARY_NAME} version"
+    if [ ! -d "$commands_dir" ]; then
+        return
     fi
+
+    for cmd_file in "$ASSETS/opencode/commands/"*.md; do
+        local filename
+        filename="$(basename "$cmd_file")"
+        cp "$cmd_file" "$commands_dir/$filename"
+    done
+
+    info "  opencode: OPSX commands installed"
 }
 
 # ============================================================================
-# Next steps
+# Summary
 # ============================================================================
 
-print_next_steps() {
+print_summary() {
+    step "Patching agent orchestrators"
+    patch_file_agents
+    patch_opencode_commands
+
     echo ""
-    echo -e "${GREEN}${BOLD}Installation complete!${NC}"
+    echo -e "${GREEN}${BOLD}OPSX patch applied successfully!${NC}"
     echo ""
-    echo -e "${BOLD}Your agents are now configured with OPSX.${NC}"
+    echo -e "${BOLD}What was patched:${NC}"
+    echo -e "  - Skills rewritten to use ${CYAN}openspec CLI${NC}"
+    echo -e "  - Orchestrator instructions updated to ${CYAN}OPSX workflow${NC}"
+    echo -e "  - Legacy SDD commands removed"
     echo ""
-    echo -e "${BOLD}OPSX Commands:${NC}"
+    echo -e "${BOLD}OPSX Commands (in your AI agent):${NC}"
     echo -e "  ${CYAN}/opsx:explore${NC}  — Think through ideas before committing"
     echo -e "  ${CYAN}/opsx:propose${NC}  — Create a change with all artifacts"
     echo -e "  ${CYAN}/opsx:apply${NC}    — Implement tasks from the change"
     echo -e "  ${CYAN}/opsx:archive${NC}  — Sync specs and close the change"
     echo ""
+    echo -e "${DIM}Restart your AI agent for changes to take effect.${NC}"
     echo -e "${DIM}Docs: https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}${NC}"
     echo ""
 }
@@ -247,11 +338,11 @@ main() {
     setup_colors
     print_banner
     check_prerequisites
+    clone_fork
     clean_legacy
-    install_from_source
-    run_sync
-    verify_installation
-    print_next_steps
+    patch_skills
+    patch_claude
+    print_summary
 }
 
 main "$@"
