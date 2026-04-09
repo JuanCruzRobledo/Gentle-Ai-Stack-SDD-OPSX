@@ -1,151 +1,271 @@
-<div align="center">
+# Gentle-AI Stack con OPSX
 
-<img width="3276" height="1280" alt="image" src="https://github.com/user-attachments/assets/3a3e4ae1-b9f4-4ce9-8fd0-3833812beb99" />
+**Fork mejorado del [Gentle-AI Stack](https://github.com/Gentleman-Programming/gentle-ai) original, actualizado para usar el workflow OPSX de OpenSpec.**
 
-<h1>AI Gentle Stack</h1>
-
-<p><strong>One command. Any agent. Any OS. The Gentleman AI ecosystem -- configured and ready.</strong></p>
-
-<p>
-<a href="https://github.com/Gentleman-Programming/gentle-ai/releases"><img src="https://img.shields.io/github/v/release/Gentleman-Programming/gentle-ai" alt="Release"></a>
-<a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
-<img src="https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go&logoColor=white" alt="Go 1.24+">
-<img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey" alt="Platform">
-</p>
-
-</div>
+> Este repositorio reemplaza el flujo Legacy (SDD con fases rigidas) por el nuevo flujo **OPSX** (acciones fluidas e iterativas). Si ya tenes el stack original instalado, esta guia te lleva paso a paso a la version mejorada.
 
 ---
 
-## What It Does
+## Que cambio respecto al original?
 
-This is NOT an AI agent installer. Most agents are easy to install. This is an **ecosystem configurator** -- it takes whatever AI coding agent(s) you use and supercharges them with the Gentleman stack: persistent memory, Spec-Driven Development workflow, curated coding skills, MCP servers, an AI provider switcher, a teaching-oriented persona with security-first permissions, and per-phase model assignment so each SDD step can run on a different model.
+| Aspecto | Stack Original (Legacy) | Este Fork (OPSX) |
+|---------|------------------------|-------------------|
+| **Flujo de trabajo** | Fases rigidas y bloqueantes (`planning -> implementing -> archiving`) | Fluido e iterativo: explora, propone, aplica, archiva en cualquier orden |
+| **Comandos** | `/sdd-apply`, `/sdd-archive`, `/sdd-explore`, etc. | `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, `/opsx:archive` |
+| **Orchestrator** | Coordina sub-agentes SDD con engram y fases | Coordina via skills + CLI `openspec` como fuente de verdad |
+| **Skills** | Logica interna con persistencia engram | Delegacion directa al CLI `openspec` |
+| **Vuelta atras** | No permitida entre fases | Podes actualizar cualquier artefacto en cualquier momento |
 
-**Before**: "I installed Claude Code / OpenCode / Cursor, but it's just a chatbot that writes code."
+### Archivos modificados
 
-**After**: Your agent now has memory, skills, workflow, MCP tools, and a persona that actually teaches you.
+Los cambios principales estan en:
 
-### 8 Supported Agents
+```
+internal/assets/
+  generic/sdd-orchestrator.md        -> Reescrito con instrucciones OPSX (OpenCode)
+  claude/sdd-orchestrator.md         -> Reescrito con instrucciones OPSX (Claude Code)
+  gemini/sdd-orchestrator.md         -> Reescrito con instrucciones OPSX (Gemini CLI)
+  codex/sdd-orchestrator.md          -> Reescrito con instrucciones OPSX (Codex)
+  cursor/sdd-orchestrator.md         -> Reescrito con instrucciones OPSX (Cursor)
+  windsurf/sdd-orchestrator.md       -> Reescrito con instrucciones OPSX (Windsurf)
+  antigravity/sdd-orchestrator.md    -> Reescrito con instrucciones OPSX (Antigravity)
+  opencode/commands/                 -> Comandos renombrados: sdd-* a opsx-*
+  opencode/sdd-overlay-*.json        -> Simplificado (solo orchestrator, sin sub-agentes)
+  skills/sdd-*/SKILL.md              -> Reescritos para usar openspec CLI
+```
 
-| Agent | Delegation Model | Key Feature |
-|-------|:---:|---|
-| **Claude Code** | Full (Task tool) | Sub-agents, output styles |
-| **OpenCode** | Full (multi-mode overlay) | Per-phase model routing |
-| **Gemini CLI** | Full (experimental) | Custom agents in `~/.gemini/agents/` |
-| **Cursor** | Full (native subagents) | 9 SDD agents in `~/.cursor/agents/` |
-| **VS Code Copilot** | Full (runSubagent) | Parallel execution |
-| **Codex** | Solo-agent | CLI-native, TOML config |
-| **Windsurf** | Solo-agent | Plan Mode, Code Mode, native workflows |
-| **Antigravity** | Solo-agent + Mission Control | Built-in Browser/Terminal sub-agents |
-
-> **Note**: This project supersedes [Agent Teams Lite](https://github.com/Gentleman-Programming/agent-teams-lite) (now archived). Everything ATL provided is included here with better installation, automatic updates, and persistent memory.
+> **Todos los agentes soportados** (Claude Code, OpenCode, Cursor, Gemini CLI, Codex, Windsurf, Antigravity) reciben las instrucciones OPSX. Cada orchestrator mantiene las particularidades de su herramienta (sub-agentes, inline execution, Plan Mode, etc.) pero con el core OPSX.
 
 ---
 
-## Quick Start
+## Pre-requisitos
 
-### macOS / Linux
+- **Go 1.24+** instalado ([descargar](https://go.dev/dl/))
+- **El stack original ya instalado** (si nunca lo instalaste, hace eso primero desde el [repo original](https://github.com/Gentleman-Programming/gentle-ai))
+
+Verifica Go:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/scripts/install.sh | bash
+go version
 ```
-
-### Windows
-
-```powershell
-scoop bucket add gentleman https://github.com/Gentleman-Programming/scoop-bucket
-scoop install gentle-ai
-```
-
-Or via PowerShell script: `irm https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/scripts/install.ps1 | iex`
-
-### After install: project-level setup
-
-Once your agents are configured, open your AI agent in a project and run these two commands to register the project context:
-
-| Command | What it does | When to re-run |
-|---------|-------------|----------------|
-| `/sdd-init` | Detects stack, testing capabilities, activates Strict TDD Mode if available | When your project adds/removes test frameworks, or first time in a new project |
-| `skill-registry` | Scans installed skills and project conventions, builds the registry | After installing/removing skills, or first time in a new project |
-
-These are **not required** for basic usage. The SDD orchestrator runs `/sdd-init` automatically if it detects no context. But if something changed in your project (new test runner, new dependencies), re-running them manually ensures the agents have up-to-date context.
 
 ---
 
-## Install
+## Instalacion
 
-### Homebrew (macOS / Linux)
+### 1. Clonar o descargar este repositorio
 
 ```bash
-brew tap Gentleman-Programming/homebrew-tap
-brew install gentle-ai
+git clone https://github.com/JuanCruzRobledo/Gentle-Ai-Stack-SDD-OPSX.git
+cd Gentle-Ai-Stack-SDD-OPSX
 ```
 
-### Go install (any platform with Go 1.24+)
+### 2. Limpiar la configuracion anterior (IMPORTANTE)
+
+Si ya tenias el stack original instalado, **es necesario limpiar la configuracion anterior** antes de sincronizar. El sync hace un merge (no un reemplazo), asi que los comandos y agentes del flujo Legacy persisten y generan conflictos con OPSX.
+
+**Linux / macOS (OpenCode):**
 
 ```bash
-go install github.com/gentleman-programming/gentle-ai/cmd/gentle-ai@latest
+rm -rf ~/.config/opencode/commands/sdd-*.md
+rm -f ~/.config/opencode/opencode.json
 ```
 
-### Scoop (Windows)
+**Linux / macOS (otras herramientas):**
+
+```bash
+# Claude Code
+rm -rf ~/.claude/commands/sdd-*.md
+
+# Cursor
+rm -rf ~/.cursor/agents/sdd-*.md
+
+# Gemini CLI
+rm -rf ~/.gemini/commands/sdd-*.md
+```
+
+**Windows (PowerShell):**
 
 ```powershell
-scoop bucket add gentleman https://github.com/Gentleman-Programming/scoop-bucket
-scoop install gentle-ai
+# OpenCode
+Remove-Item "$HOME\.config\opencode\commands\sdd-*.md" -ErrorAction SilentlyContinue
+Remove-Item "$HOME\.config\opencode\opencode.json" -ErrorAction SilentlyContinue
+
+# Claude Code
+Remove-Item "$HOME\.claude\commands\sdd-*.md" -ErrorAction SilentlyContinue
+
+# Cursor
+Remove-Item "$HOME\.cursor\agents\sdd-*.md" -ErrorAction SilentlyContinue
 ```
 
-**Migrating from PowerShell installer to Scoop?** Remove the old binary first:
+> **Por que es necesario?** El sync del stack original instala comandos `sdd-*.md` y agentes con instrucciones Legacy. El sync de este fork agrega los nuevos `opsx-*` pero NO borra los viejos. La herramienta ve ambos sets de comandos y el orchestrator puede caer en el comportamiento Legacy.
 
-```powershell
-Remove-Item "$env:LOCALAPPDATA\gentle-ai" -Recurse -Force
-# Then install via Scoop as shown above
+### 3. Compilar
+
+**Windows:**
+
+```bash
+go build -o gentle-ai.exe ./cmd/gentle-ai/
 ```
 
-### Windows (PowerShell — alternative)
+**Linux / macOS:**
 
-```powershell
-# Option 1: PowerShell installer (downloads binary from GitHub Releases)
-irm https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/scripts/install.ps1 | iex
-
-# Option 2: Go install (requires Go 1.24+)
-go install github.com/gentleman-programming/gentle-ai/cmd/gentle-ai@latest
+```bash
+go build -o gentle-ai ./cmd/gentle-ai/
 ```
 
-### From releases
+### 4. Sincronizar
 
-Download the binary for your platform from [GitHub Releases](https://github.com/Gentleman-Programming/gentle-ai/releases).
+**Windows:**
+
+```bash
+./gentle-ai.exe sync
+```
+
+**Linux / macOS:**
+
+```bash
+./gentle-ai sync
+```
+
+Si la terminal muestra el mensaje de exito, tu entorno esta actualizado con OPSX.
 
 ---
 
-## Backups
+## Verificacion
 
-Every install, sync, and upgrade automatically snapshots your config files. Backups are **compressed** (tar.gz), **deduplicated** (identical configs are not re-backed up), and **auto-pruned** (keeps the 5 most recent). Pin important backups via the TUI (`p` key) to protect them from pruning.
+Abri OpenCode en cualquier proyecto y preguntale al agente:
 
-See [Backup & Rollback Guide](docs/rollback.md) for details.
+```
+Quien sos y que podes hacer? Explicame tu flujo de trabajo completo.
+```
 
----
+Deberia responder mencionando:
+- Que es el **OPSX Orchestrator**
+- Que trabaja con el CLI `openspec`
+- Que el flujo es: **explore -> propose -> apply -> archive**
+- Que los comandos son `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, `/opsx:archive`
 
-## Documentation
-
-| Topic | Description |
-|-------|-------------|
-| [Intended Usage](docs/intended-usage.md) | How gentle-ai is meant to be used — the mental model |
-| [Agents](docs/agents.md) | Supported agents, feature matrix, config paths, and per-agent notes |
-| [Components, Skills & Presets](docs/components.md) | All components, GGA behavior, skill catalog, and preset definitions |
-| [Usage](docs/usage.md) | Persona modes, interactive TUI, CLI flags, and dependency management |
-| [Backup & Rollback](docs/rollback.md) | Backup retention, compression, dedup, pinning, and restore |
-| [Platforms](docs/platforms.md) | Supported platforms, Windows notes, security verification, config paths |
-| [Architecture & Development](docs/architecture.md) | Codebase layout, testing, and relationship to Gentleman.Dots |
+Si responde con el flujo viejo (menciona `/sdd-*`, fases rigidas, phase gates), revisa la seccion de troubleshooting.
 
 ---
 
-## Contributors
+## Flujo OPSX — Como funciona
 
-This project exists because of the community. See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the full list.
+```
+/opsx:explore   (opcional: pensar antes de comprometerse)
+       |
+       v
+/opsx:propose   (crear cambio + propuesta + diseno + tareas)
+       |
+       v
+/opsx:apply     (implementar las tareas del cambio)
+       |
+       v
+/opsx:archive   (sincronizar specs + cerrar el cambio)
+```
 
-<a href="https://github.com/Gentleman-Programming/gentle-ai/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=Gentleman-Programming/gentle-ai" />
-</a>
+**No hay fases rigidas.** Podes volver atras, saltear pasos, o repetir cualquier accion en cualquier momento.
+
+### Comandos
+
+| Comando | Que hace |
+|---------|----------|
+| `/opsx:explore [tema]` | Modo exploracion: investigar ideas, aclarar requisitos, pensar. No genera archivos. |
+| `/opsx:propose [nombre]` | Crea un cambio con todos los artefactos: `proposal.md`, `design.md`, `tasks.md` |
+| `/opsx:apply [nombre]` | Implementa las tareas del cambio, marcandolas como completadas |
+| `/opsx:archive [nombre]` | Sincroniza delta specs con los specs principales y archiva el cambio |
+
+### Estructura de un cambio
+
+```
+openspec/changes/<nombre-del-cambio>/
+  .openspec.yaml    <- metadata del cambio
+  proposal.md       <- que y por que
+  design.md         <- como (enfoque tecnico)
+  tasks.md          <- checklist de implementacion
+  specs/            <- delta specs (requisitos que cambian)
+```
+
+---
+
+## Troubleshooting
+
+### El agente sigue respondiendo con el flujo Legacy (SDD)
+
+**Causa:** Quedan archivos del stack original en la configuracion de OpenCode.
+
+**Solucion:**
+
+1. Borra la configuracion vieja (paso 2 de la instalacion)
+2. Volve a compilar y sincronizar (pasos 3 y 4)
+
+Podes verificar que no queden residuos:
+
+```bash
+# Linux/macOS
+ls ~/.config/opencode/commands/
+
+# Solo deberian estar: opsx-apply.md, opsx-archive.md, opsx-explore.md, opsx-propose.md
+```
+
+```powershell
+# Windows
+dir $HOME\.config\opencode\commands\
+
+# Solo deberian estar: opsx-apply.md, opsx-archive.md, opsx-explore.md, opsx-propose.md
+```
+
+Si ves archivos `sdd-*.md`, borra la carpeta `commands/` completa y volve a sincronizar:
+
+```bash
+# Linux/macOS
+rm -rf ~/.config/opencode/commands/
+./gentle-ai sync
+
+# Windows
+Remove-Item "$HOME\.config\opencode\commands" -Recurse -Force
+./gentle-ai.exe sync
+```
+
+### El build falla con errores de Go
+
+- Verifica que tenes Go 1.24+ con `go version`
+- Asegurate de estar en la raiz del repositorio (donde esta `go.mod`)
+
+### OpenCode no reconoce los comandos `/opsx:*`
+
+- Verifica que el sync termino sin errores
+- Reinicia OpenCode despues del sync
+- Revisa que `~/.config/opencode/commands/` tenga los archivos `opsx-*.md`
+
+---
+
+## Diferencia conceptual: Legacy vs OPSX
+
+El stack original usaba **Spec-Driven Development (SDD)** con fases bloqueantes:
+
+```
+LEGACY: Planning -> Implementing -> Archiving (lineal, sin vuelta atras)
+```
+
+OPSX reemplaza esto con **acciones fluidas**:
+
+```
+OPSX: Cualquier accion, en cualquier momento, sobre cualquier cambio
+```
+
+La fuente de verdad pasa de ser el estado interno del agente (engram) a ser el **CLI `openspec`**. El orchestrator siempre consulta `openspec status` antes de actuar — nunca asume el estado de los artefactos.
+
+Para mas contexto sobre OPSX y OpenSpec, consulta la [documentacion oficial de OpenSpec](https://openspec.dev/).
+
+---
+
+## Creditos
+
+- **Stack original:** [Gentleman Programming — gentle-ai](https://github.com/Gentleman-Programming/gentle-ai)
+- **OpenSpec / OPSX:** [Fission AI — OpenSpec](https://github.com/Fission-AI/OpenSpec)
+- **Fork OPSX:** [JuanCruzRobledo](https://github.com/JuanCruzRobledo/Gentle-Ai-Stack-SDD-OPSX)
 
 ---
 
