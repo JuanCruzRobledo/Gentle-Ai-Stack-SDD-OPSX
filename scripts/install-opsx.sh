@@ -126,6 +126,137 @@ install_from_source() {
     fi
 }
 
+remove_conflicting_binaries() {
+    step "Checking for conflicting gentle-ai binaries"
+
+    local opsx_dir="$OPSX_INSTALL_DIR"
+    local found_conflict=false
+
+    # Check go/bin (from original `go install`)
+    if command -v go &>/dev/null; then
+        local gobin
+        gobin="$(go env GOBIN 2>/dev/null)"
+        if [ -z "$gobin" ]; then
+            gobin="$(go env GOPATH 2>/dev/null)/bin"
+        fi
+        local go_binary="${gobin}/${BINARY_NAME}"
+        if [ -f "$go_binary" ] && [ "$gobin" != "$opsx_dir" ]; then
+            warn "Removing conflicting binary: $go_binary"
+            rm -f "$go_binary" 2>/dev/null || sudo rm -f "$go_binary" 2>/dev/null || warn "Could not remove $go_binary — delete it manually"
+            found_conflict=true
+        fi
+    fi
+
+    # Check all instances in PATH that aren't ours
+    local all_matches
+    all_matches="$(which -a "$BINARY_NAME" 2>/dev/null || true)"
+    if [ -n "$all_matches" ]; then
+        while IFS= read -r match; do
+            local match_dir
+            match_dir="$(dirname "$match")"
+            if [ "$match_dir" != "$opsx_dir" ] && [ -f "$match" ]; then
+                warn "Removing conflicting binary: $match"
+                rm -f "$match" 2>/dev/null || sudo rm -f "$match" 2>/dev/null || warn "Could not remove $match — delete it manually"
+                found_conflict=true
+            fi
+        done <<< "$all_matches"
+    fi
+
+    if [ "$found_conflict" = false ]; then
+        success "No conflicting binaries found"
+    fi
+}
+
+set_persistent_no_self_update() {
+    step "Disabling self-update permanently"
+
+    export GENTLE_AI_NO_SELF_UPDATE=1
+
+    # Persist in shell profile
+    local shell_rc=""
+    if [ -n "${ZSH_VERSION:-}" ] || [ -f "$HOME/.zshrc" ]; then
+        shell_rc="$HOME/.zshrc"
+    elif [ -f "$HOME/.bashrc" ]; then
+        shell_rc="$HOME/.bashrc"
+    elif [ -f "$HOME/.bash_profile" ]; then
+        shell_rc="$HOME/.bash_profile"
+    fi
+
+    if [ -n "$shell_rc" ]; then
+        local export_line='export GENTLE_AI_NO_SELF_UPDATE=1'
+        if ! grep -qF "$export_line" "$shell_rc" 2>/dev/null; then
+            echo "" >> "$shell_rc"
+            echo "# Prevent gentle-ai from self-updating (OPSX fork)" >> "$shell_rc"
+            echo "$export_line" >> "$shell_rc"
+            success "Added GENTLE_AI_NO_SELF_UPDATE=1 to $shell_rc"
+        else
+            success "GENTLE_AI_NO_SELF_UPDATE already in $shell_rc"
+        fi
+    else
+        warn "Could not detect shell profile. Add manually: export GENTLE_AI_NO_SELF_UPDATE=1"
+    fi
+}
+
+# ============================================================================
+# Patch state.json to include all detected agents
+# ============================================================================
+
+update_agent_state() {
+    step "Detecting installed AI agents"
+
+    local state_dir="$HOME/.gentle-ai"
+    local state_path="$state_dir/state.json"
+    local detected=()
+
+    # Claude Code
+    if command -v claude &>/dev/null; then
+        detected+=("claude-code")
+    fi
+
+    # OpenCode
+    if command -v opencode &>/dev/null; then
+        detected+=("opencode")
+    fi
+
+    # Cursor
+    if [ -d "$HOME/.cursor" ]; then
+        detected+=("cursor")
+    fi
+
+    # Windsurf
+    if [ -d "$HOME/.windsurf" ]; then
+        detected+=("windsurf")
+    fi
+
+    # VS Code (Copilot)
+    if [ -d "$HOME/.vscode" ]; then
+        detected+=("vscode")
+    fi
+
+    if [ ${#detected[@]} -eq 0 ]; then
+        warn "No AI agents detected - sync may be a no-op"
+        return
+    fi
+
+    success "Detected agents: ${detected[*]}"
+
+    mkdir -p "$state_dir"
+
+    local json_array=""
+    local first=true
+    for agent in "${detected[@]}"; do
+        if [ "$first" = true ]; then
+            json_array="    \"$agent\""
+            first=false
+        else
+            json_array="$json_array,\n    \"$agent\""
+        fi
+    done
+
+    printf '{\n  "installed_agents": [\n%b\n  ]\n}\n' "$json_array" > "$state_path"
+    success "Updated state.json with all detected agents"
+}
+
 # ============================================================================
 # Clean previous config (so sync creates fresh OPSX)
 # ============================================================================
@@ -180,14 +311,9 @@ clean_previous_config() {
 # ============================================================================
 
 run_sync() {
-    step "Running OPSX binary sync (self-update disabled)"
-
-    # CRITICAL: Disable self-update so our OPSX binary doesn't get replaced
-    # by the official release from Gentleman-Programming/gentle-ai
-    export GENTLE_AI_NO_SELF_UPDATE=1
+    step "Running OPSX binary sync"
 
     # Use the EXACT path of our installed binary, NOT whatever is in PATH
-    # (the official binary may be in ~/go/bin/ or /usr/local/bin/ and take priority)
     local opsx_binary="${OPSX_INSTALL_DIR}/${BINARY_NAME}"
 
     if [ -x "$opsx_binary" ]; then
@@ -215,9 +341,9 @@ print_summary() {
     echo -e "  ${CYAN}/opsx:apply${NC}    — Implement tasks from the change"
     echo -e "  ${CYAN}/opsx:archive${NC}  — Sync specs and close the change"
     echo ""
-    echo -e "${YELLOW}${BOLD}IMPORTANT:${NC} If you run 'gentle-ai sync' in the future, always use:"
-    echo -e "  ${DIM}GENTLE_AI_NO_SELF_UPDATE=1 gentle-ai sync${NC}"
-    echo -e "  ${DIM}Otherwise the official binary will overwrite OPSX.${NC}"
+    echo -e "${YELLOW}${BOLD}PROTECTED:${NC} Self-update is permanently disabled so 'gentle-ai sync'"
+    echo -e "  ${DIM}will always use your OPSX binary. To undo: remove GENTLE_AI_NO_SELF_UPDATE${NC}"
+    echo -e "  ${DIM}from your shell profile.${NC}"
     echo ""
     echo -e "${DIM}Docs: https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}${NC}"
     echo ""
@@ -232,6 +358,9 @@ main() {
     print_banner
     check_prerequisites
     install_from_source
+    remove_conflicting_binaries
+    set_persistent_no_self_update
+    update_agent_state
     clean_previous_config
     run_sync
     print_summary

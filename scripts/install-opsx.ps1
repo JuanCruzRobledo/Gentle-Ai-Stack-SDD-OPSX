@@ -1,12 +1,12 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    gentle-ai OPSX — Install Script for Windows
+    gentle-ai OPSX - Install Script for Windows
     Compiles the OPSX fork and syncs it, creating the full config from scratch.
 
 .DESCRIPTION
     Clones the OPSX fork, builds from source, and runs sync with self-update
-    disabled so the official binary doesn't overwrite OPSX changes.
+    disabled so the official binary does not overwrite OPSX changes.
     Requires Go 1.24+ and git.
 
 .EXAMPLE
@@ -75,6 +75,56 @@ function Test-Prerequisites {
 }
 
 # ============================================================================
+# Remove conflicting binaries
+# ============================================================================
+
+function Remove-ConflictingBinaries {
+    Write-Step "Checking for conflicting gentle-ai binaries"
+
+    $opsxInstallDir = Join-Path $env:LOCALAPPDATA "gentle-ai\bin"
+    $conflicts = @()
+
+    # Check go/bin (from original go install)
+    if (Get-Command "go" -ErrorAction SilentlyContinue) {
+        $gobin = & go env GOBIN 2>$null
+        if (-not $gobin) {
+            $gopath = & go env GOPATH 2>$null
+            $gobin = Join-Path $gopath "bin"
+        }
+        $goBinary = Join-Path $gobin "$BINARY_NAME.exe"
+        if ((Test-Path $goBinary) -and ($gobin -ne $opsxInstallDir)) {
+            $conflicts += $goBinary
+        }
+    }
+
+    # Check any other gentle-ai.exe in PATH that is not ours
+    $allMatches = where.exe $BINARY_NAME 2>$null
+    if ($allMatches) {
+        foreach ($match in $allMatches) {
+            $matchDir = Split-Path $match -Parent
+            if ($matchDir -ne $opsxInstallDir -and (Test-Path $match)) {
+                if ($conflicts -notcontains $match) { $conflicts += $match }
+            }
+        }
+    }
+
+    if ($conflicts.Count -eq 0) {
+        Write-Success "No conflicting binaries found"
+        return
+    }
+
+    foreach ($conflict in $conflicts) {
+        Write-Warn "Removing conflicting binary: $conflict"
+        Remove-Item $conflict -Force -ErrorAction SilentlyContinue
+        if (-not (Test-Path $conflict)) {
+            Write-Success "Removed $conflict"
+        } else {
+            Write-Warn "Could not remove $conflict - delete it manually to avoid PATH conflicts"
+        }
+    }
+}
+
+# ============================================================================
 # Clone, build, install
 # ============================================================================
 
@@ -84,7 +134,9 @@ function Install-FromSource {
     $script:TmpDir = Join-Path $env:TEMP "gentle-ai-opsx-$(Get-Random)"
     New-Item -ItemType Directory -Path $script:TmpDir -Force | Out-Null
 
-    & git clone --depth 1 "https://github.com/$GITHUB_OWNER/$GITHUB_REPO.git" "$script:TmpDir\repo" 2>&1 | Select-Object -Last 1
+    $ErrorActionPreference = "Continue"
+    & git clone --depth 1 "https://github.com/$GITHUB_OWNER/$GITHUB_REPO.git" "$script:TmpDir\repo" 2>$null
+    $ErrorActionPreference = "Stop"
     if ($LASTEXITCODE -ne 0) { Stop-WithError "Failed to clone repository" }
     Write-Success "Cloned"
 
@@ -109,17 +161,92 @@ function Install-FromSource {
 
     if ($env:PATH -notlike "*$installDir*") {
         Write-Info "Adding to user PATH..."
-        $currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+        $currentPath = [Environment]::GetEnvironmentVariable("PATH", [EnvironmentVariableTarget]::User)
         if ($currentPath -notlike "*$installDir*") {
-            [Environment]::SetEnvironmentVariable("PATH", "$currentPath;$installDir", "User")
+            [Environment]::SetEnvironmentVariable("PATH", ($currentPath + ";" + $installDir), [EnvironmentVariableTarget]::User)
         }
-        $env:PATH = "$env:PATH;$installDir"
+        $env:PATH = $env:PATH + ";" + $installDir
         Write-Success "Added to PATH"
     }
 }
 
 # ============================================================================
-# Sync (with self-update DISABLED)
+# Disable self-update permanently
+# ============================================================================
+
+function Set-PersistentNoSelfUpdate {
+    Write-Step "Disabling self-update permanently (prevents official binary from overwriting OPSX)"
+
+    $currentValue = [Environment]::GetEnvironmentVariable("GENTLE_AI_NO_SELF_UPDATE", [EnvironmentVariableTarget]::User)
+    if ($currentValue -ne "1") {
+        [Environment]::SetEnvironmentVariable("GENTLE_AI_NO_SELF_UPDATE", "1", [EnvironmentVariableTarget]::User)
+        Write-Success "GENTLE_AI_NO_SELF_UPDATE=1 set as persistent user variable"
+    } else {
+        Write-Success "GENTLE_AI_NO_SELF_UPDATE already set"
+    }
+
+    $env:GENTLE_AI_NO_SELF_UPDATE = "1"
+}
+
+# ============================================================================
+# Patch state.json to include all detected agents
+# ============================================================================
+
+function Update-AgentState {
+    Write-Step "Detecting installed AI agents"
+
+    $stateDir = Join-Path $HOME ".gentle-ai"
+    $statePath = Join-Path $stateDir "state.json"
+
+    $detectedAgents = @()
+
+    # Claude Code
+    if (Get-Command "claude" -ErrorAction SilentlyContinue) {
+        $detectedAgents += "claude-code"
+    }
+
+    # OpenCode
+    if (Get-Command "opencode" -ErrorAction SilentlyContinue) {
+        $detectedAgents += "opencode"
+    }
+
+    # Cursor
+    $cursorDir = Join-Path $HOME ".cursor"
+    if (Test-Path $cursorDir) {
+        $detectedAgents += "cursor"
+    }
+
+    # Windsurf
+    $windsurfDir = Join-Path $HOME ".windsurf"
+    if (Test-Path $windsurfDir) {
+        $detectedAgents += "windsurf"
+    }
+
+    # VS Code (Copilot)
+    $vscodeDir = Join-Path $HOME ".vscode"
+    if (Test-Path $vscodeDir) {
+        $detectedAgents += "vscode"
+    }
+
+    if ($detectedAgents.Count -eq 0) {
+        Write-Warn "No AI agents detected - sync may be a no-op"
+        return
+    }
+
+    Write-Success ("Detected agents: " + ($detectedAgents -join ", "))
+
+    if (-not (Test-Path $stateDir)) {
+        New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
+    }
+
+    $agentsJson = ($detectedAgents | ForEach-Object { "    `"$_`"" }) -join ",`n"
+    $stateContent = "{`n  `"installed_agents`": [`n$agentsJson`n  ]`n}"
+    Set-Content -Path $statePath -Value $stateContent -Encoding UTF8
+    Write-Success "Updated state.json with all detected agents"
+}
+
+# ============================================================================
+# Clean previous config
 # ============================================================================
 
 function Clear-LegacyConfig {
@@ -145,11 +272,13 @@ function Clear-LegacyConfig {
     $claudeMd = Join-Path $HOME ".claude\CLAUDE.md"
     if (Test-Path $claudeMd) {
         $content = Get-Content -Path $claudeMd -Raw
-        $openMarker = "<!-- gentle-ai:sdd-orchestrator -->"
-        $closeMarker = "<!-- /gentle-ai:sdd-orchestrator -->"
-        if ($content -match [regex]::Escape($openMarker)) {
-            $pattern = "(?s)$([regex]::Escape($openMarker)).*?$([regex]::Escape($closeMarker))\r?\n?"
-            $content = [regex]::Replace($content, $pattern, "")
+        $openTag = "<!-- gentle-ai:sdd-orchestrator -->"
+        $closeTag = "<!-- /gentle-ai:sdd-orchestrator -->"
+        if ($content -match [regex]::Escape($openTag)) {
+            $escapedOpen = [regex]::Escape($openTag)
+            $escapedClose = [regex]::Escape($closeTag)
+            $regexPattern = "(?s)" + $escapedOpen + ".*?" + $escapedClose + "\r?\n?"
+            $content = [regex]::Replace($content, $regexPattern, "")
             Set-Content -Path $claudeMd -Value $content -NoNewline
             $cleaned = $true
         }
@@ -169,15 +298,13 @@ function Clear-LegacyConfig {
     }
 }
 
+# ============================================================================
+# Sync
+# ============================================================================
+
 function Invoke-Sync {
-    Write-Step "Running OPSX binary sync (self-update disabled)"
+    Write-Step "Running OPSX binary sync"
 
-    # CRITICAL: Disable self-update so our OPSX binary doesn't get replaced
-    # by the official release from Gentleman-Programming/gentle-ai
-    $env:GENTLE_AI_NO_SELF_UPDATE = "1"
-
-    # Use the EXACT path of our installed binary, NOT whatever is in PATH
-    # (the official binary may be in ~/go/bin/ and take priority)
     $opsxBinary = Join-Path $env:LOCALAPPDATA "gentle-ai\bin\$BINARY_NAME.exe"
 
     if (Test-Path $opsxBinary) {
@@ -187,9 +314,6 @@ function Invoke-Sync {
     } else {
         Stop-WithError "OPSX binary not found at $opsxBinary"
     }
-
-    # Clean up env var
-    Remove-Item Env:\GENTLE_AI_NO_SELF_UPDATE -ErrorAction SilentlyContinue
 }
 
 # ============================================================================
@@ -208,11 +332,11 @@ function Show-Summary {
     Write-Host "  /opsx:apply    - Implement tasks from the change" -ForegroundColor Cyan
     Write-Host "  /opsx:archive  - Sync specs and close the change" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "IMPORTANT: If you run 'gentle-ai sync' in the future, always use:" -ForegroundColor Yellow
-    Write-Host '  $env:GENTLE_AI_NO_SELF_UPDATE = "1"; gentle-ai sync' -ForegroundColor DarkGray
-    Write-Host "  Otherwise the official binary will overwrite OPSX." -ForegroundColor DarkGray
+    Write-Host "PROTECTED: Self-update is permanently disabled so gentle-ai sync" -ForegroundColor Yellow
+    Write-Host "  will always use your OPSX binary. To undo: remove the" -ForegroundColor DarkGray
+    Write-Host "  GENTLE_AI_NO_SELF_UPDATE user environment variable." -ForegroundColor DarkGray
     Write-Host ""
-    Write-Host "Docs: https://github.com/$GITHUB_OWNER/$GITHUB_REPO" -ForegroundColor DarkGray
+    Write-Host ("Docs: https://github.com/" + $GITHUB_OWNER + "/" + $GITHUB_REPO) -ForegroundColor DarkGray
     Write-Host ""
 }
 
@@ -224,6 +348,9 @@ function Main {
     Show-Banner
     Test-Prerequisites
     Install-FromSource
+    Remove-ConflictingBinaries
+    Set-PersistentNoSelfUpdate
+    Update-AgentState
     Clear-LegacyConfig
     Invoke-Sync
     Show-Summary
