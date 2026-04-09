@@ -20,8 +20,8 @@ curl -fsSL https://raw.githubusercontent.com/JuanCruzRobledo/Gentle-Ai-Stack-SDD
 irm https://raw.githubusercontent.com/JuanCruzRobledo/Gentle-Ai-Stack-SDD-OPSX/main/scripts/install-opsx.ps1 | iex
 ```
 
-> **Requisito previo:** tener [gentle-ai](https://github.com/Gentleman-Programming/gentle-ai) instalado y sincronizado.
-> El script solo necesita **git** (no Go). Descarga los archivos OPSX y los aplica como parche sobre la instalacion existente.
+> **Requisito:** Go 1.24+ ([descargar](https://go.dev/dl/)) y git.
+> El script clona este fork, compila el binario, y crea toda la configuracion desde cero con OPSX. No necesita el stack original instalado.
 
 ---
 
@@ -59,37 +59,28 @@ internal/assets/
 
 ## Como funciona
 
-El script de Quick Start funciona como un **parche** sobre el stack original:
+El script de Quick Start:
 
-1. **Prerequisito**: Tenes [gentle-ai](https://github.com/Gentleman-Programming/gentle-ai) instalado y sincronizado
-2. **El script**: Clona este fork, copia los archivos OPSX encima de los Legacy, y limpia los comandos viejos
-3. **Resultado**: Tus agentes ahora usan OPSX en vez de SDD Legacy
+1. Clona este fork y lo compila desde el codigo fuente
+2. Instala el binario en tu sistema
+3. Corre `gentle-ai sync` con **self-update desactivado** (`GENTLE_AI_NO_SELF_UPDATE=1`)
+4. Resultado: toda la configuracion se crea con OPSX desde cero
 
-**No compila nada, no corre `gentle-ai sync`, no depende de Go.** Solo necesita `git`.
+> **Por que desactivar self-update?** El `gentle-ai sync` original se auto-actualiza descargando el binario oficial de GitHub Releases. Si no lo desactivamos, reemplaza nuestro fork con el original y perdemos los cambios OPSX.
 
-### Que parchea exactamente
+### Si necesitas re-sincronizar en el futuro
 
-| Componente | Que hace |
-|-----------|----------|
-| **Skills** (`sdd-*/SKILL.md`) | Reemplaza el contenido con instrucciones OPSX que usan `openspec` CLI |
-| **Orchestrators** | Reemplaza la seccion `sdd-orchestrator` en cada agente con instrucciones OPSX |
-| **Commands** (OpenCode) | Borra los `sdd-*.md` y agrega `opsx-*.md` |
-
-### Instalacion manual (sin script)
-
-Si preferis hacerlo a mano, clona este repo y copia los archivos:
+Siempre usa la variable de entorno para evitar que se sobreescriba:
 
 ```bash
-git clone --depth 1 https://github.com/JuanCruzRobledo/Gentle-Ai-Stack-SDD-OPSX.git /tmp/opsx-patch
-
-# Copiar skills (ejemplo para Claude Code, repeti para cada agente)
-cp /tmp/opsx-patch/internal/assets/skills/sdd-*/SKILL.md ~/.claude/skills/sdd-*/SKILL.md
-
-# Limpiar
-rm -rf /tmp/opsx-patch
+# Linux / macOS
+GENTLE_AI_NO_SELF_UPDATE=1 gentle-ai sync
 ```
 
-Para el orchestrator, edita manualmente el archivo de sistema de tu agente y reemplaza el contenido entre `<!-- gentle-ai:sdd-orchestrator -->` y `<!-- /gentle-ai:sdd-orchestrator -->`.
+```powershell
+# Windows
+$env:GENTLE_AI_NO_SELF_UPDATE = "1"; gentle-ai sync
+```
 
 ---
 
