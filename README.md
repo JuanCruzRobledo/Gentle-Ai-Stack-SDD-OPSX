@@ -2,7 +2,25 @@
 
 **Fork mejorado del [Gentle-AI Stack](https://github.com/Gentleman-Programming/gentle-ai) original, actualizado para usar el workflow OPSX de OpenSpec.**
 
-> Este repositorio reemplaza el flujo Legacy (SDD con fases rigidas) por el nuevo flujo **OPSX** (acciones fluidas e iterativas). Si ya tenes el stack original instalado, esta guia te lleva paso a paso a la version mejorada.
+> Este repositorio reemplaza el flujo Legacy (SDD con fases rigidas) por el nuevo flujo **OPSX** (acciones fluidas e iterativas).
+
+---
+
+## Quick Start
+
+### Linux / macOS
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/JuanCruzRobledo/Gentle-Ai-Stack-SDD-OPSX/main/scripts/install-opsx.sh | bash
+```
+
+### Windows (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/JuanCruzRobledo/Gentle-Ai-Stack-SDD-OPSX/main/scripts/install-opsx.ps1 | iex
+```
+
+> **Requisito:** Go 1.24+ ([descargar](https://go.dev/dl/)). El script clona, compila, limpia config Legacy si existe, y sincroniza automaticamente.
 
 ---
 
@@ -38,20 +56,20 @@ internal/assets/
 
 ---
 
-## Pre-requisitos
+## Instalacion manual
+
+Si preferis hacerlo paso a paso en vez del Quick Start:
+
+### Pre-requisitos
 
 - **Go 1.24+** instalado ([descargar](https://go.dev/dl/))
-- **El stack original ya instalado** (si nunca lo instalaste, hace eso primero desde el [repo original](https://github.com/Gentleman-Programming/gentle-ai))
+- **git** instalado
 
 Verifica Go:
 
 ```bash
 go version
 ```
-
----
-
-## Instalacion
 
 ### 1. Clonar o descargar este repositorio
 
@@ -60,7 +78,7 @@ git clone https://github.com/JuanCruzRobledo/Gentle-Ai-Stack-SDD-OPSX.git
 cd Gentle-Ai-Stack-SDD-OPSX
 ```
 
-### 2. Limpiar la configuracion anterior (IMPORTANTE)
+### 2. Limpiar la configuracion anterior (solo si tenes el stack original)
 
 Si ya tenias el stack original instalado, **es necesario limpiar la configuracion anterior** antes de sincronizar. El sync hace un merge (no un reemplazo), asi que los comandos y agentes del flujo Legacy persisten y generan conflictos con OPSX.
 
