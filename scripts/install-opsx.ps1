@@ -170,19 +170,22 @@ function Clear-LegacyConfig {
 }
 
 function Invoke-Sync {
-    Write-Step "Running $BINARY_NAME sync (self-update disabled)"
+    Write-Step "Running OPSX binary sync (self-update disabled)"
 
     # CRITICAL: Disable self-update so our OPSX binary doesn't get replaced
     # by the official release from Gentleman-Programming/gentle-ai
     $env:GENTLE_AI_NO_SELF_UPDATE = "1"
 
-    $cmd = Get-Command $BINARY_NAME -ErrorAction SilentlyContinue
-    if ($cmd) {
-        & $BINARY_NAME sync
+    # Use the EXACT path of our installed binary, NOT whatever is in PATH
+    # (the official binary may be in ~/go/bin/ and take priority)
+    $opsxBinary = Join-Path $env:LOCALAPPDATA "gentle-ai\bin\$BINARY_NAME.exe"
+
+    if (Test-Path $opsxBinary) {
+        Write-Info "Using: $opsxBinary"
+        & $opsxBinary sync
         Write-Success "Sync complete - OPSX config created"
     } else {
-        Write-Warn "Binary not in PATH. Restart terminal and run:"
-        Write-Warn '  $env:GENTLE_AI_NO_SELF_UPDATE = "1"; gentle-ai sync'
+        Stop-WithError "OPSX binary not found at $opsxBinary"
     }
 
     # Clean up env var

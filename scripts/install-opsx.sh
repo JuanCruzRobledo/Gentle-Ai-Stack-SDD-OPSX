@@ -98,13 +98,14 @@ install_from_source() {
 
     step "Installing binary"
 
-    local install_dir
+    # Store install dir globally so run_sync can use the exact path
     if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
-        install_dir="/usr/local/bin"
+        OPSX_INSTALL_DIR="/usr/local/bin"
     else
-        install_dir="${HOME}/.local/bin"
-        mkdir -p "$install_dir"
+        OPSX_INSTALL_DIR="${HOME}/.local/bin"
+        mkdir -p "$OPSX_INSTALL_DIR"
     fi
+    local install_dir="$OPSX_INSTALL_DIR"
 
     if cp "${BINARY_NAME}" "${install_dir}/${BINARY_NAME}" 2>/dev/null; then
         chmod +x "${install_dir}/${BINARY_NAME}"
@@ -179,17 +180,22 @@ clean_previous_config() {
 # ============================================================================
 
 run_sync() {
-    step "Running ${BINARY_NAME} sync (self-update disabled)"
+    step "Running OPSX binary sync (self-update disabled)"
 
     # CRITICAL: Disable self-update so our OPSX binary doesn't get replaced
     # by the official release from Gentleman-Programming/gentle-ai
     export GENTLE_AI_NO_SELF_UPDATE=1
 
-    if command -v "$BINARY_NAME" &>/dev/null; then
-        "$BINARY_NAME" sync
+    # Use the EXACT path of our installed binary, NOT whatever is in PATH
+    # (the official binary may be in ~/go/bin/ or /usr/local/bin/ and take priority)
+    local opsx_binary="${OPSX_INSTALL_DIR}/${BINARY_NAME}"
+
+    if [ -x "$opsx_binary" ]; then
+        info "Using: $opsx_binary"
+        "$opsx_binary" sync
         success "Sync complete — OPSX config created"
     else
-        warn "Binary not in PATH. Run: GENTLE_AI_NO_SELF_UPDATE=1 ${BINARY_NAME} sync"
+        fatal "OPSX binary not found at $opsx_binary"
     fi
 }
 
