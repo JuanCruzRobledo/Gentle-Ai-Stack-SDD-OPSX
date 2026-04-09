@@ -126,6 +126,55 @@ install_from_source() {
 }
 
 # ============================================================================
+# Clean previous config (so sync creates fresh OPSX)
+# ============================================================================
+
+clean_previous_config() {
+    step "Cleaning previous config (so sync creates fresh OPSX)"
+
+    local cleaned=false
+
+    # OpenCode: remove opencode.json entirely (sync recreates it with OPSX)
+    if [ -f "$HOME_DIR/.config/opencode/opencode.json" ]; then
+        rm -f "$HOME_DIR/.config/opencode/opencode.json"
+        cleaned=true
+    fi
+
+    # OpenCode: remove old sdd-* commands
+    if ls "$HOME_DIR/.config/opencode/commands/sdd-"*.md &>/dev/null 2>&1; then
+        rm -f "$HOME_DIR/.config/opencode/commands/sdd-"*.md
+        cleaned=true
+    fi
+
+    # Claude Code: remove sdd-orchestrator section so sync injects fresh
+    local claude_md="$HOME_DIR/.claude/CLAUDE.md"
+    if [ -f "$claude_md" ] && grep -q "<!-- gentle-ai:sdd-orchestrator -->" "$claude_md"; then
+        local tmpfile
+        tmpfile="$(mktemp)"
+        awk '
+        /<!-- gentle-ai:sdd-orchestrator -->/ { skip=1; next }
+        /<!-- \/gentle-ai:sdd-orchestrator -->/ { skip=0; next }
+        skip==0 { print }
+        ' "$claude_md" > "$tmpfile"
+        cp "$tmpfile" "$claude_md"
+        rm -f "$tmpfile"
+        cleaned=true
+    fi
+
+    # Cursor: remove old sdd-* agent files
+    if ls "$HOME_DIR/.cursor/agents/sdd-"*.md &>/dev/null 2>&1; then
+        rm -f "$HOME_DIR/.cursor/agents/sdd-"*.md
+        cleaned=true
+    fi
+
+    if [ "$cleaned" = true ]; then
+        success "Previous config cleaned"
+    else
+        success "No previous config found — clean install"
+    fi
+}
+
+# ============================================================================
 # Sync (with self-update DISABLED)
 # ============================================================================
 
@@ -177,6 +226,7 @@ main() {
     print_banner
     check_prerequisites
     install_from_source
+    clean_previous_config
     run_sync
     print_summary
 }

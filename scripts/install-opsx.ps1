@@ -122,6 +122,53 @@ function Install-FromSource {
 # Sync (with self-update DISABLED)
 # ============================================================================
 
+function Clear-LegacyConfig {
+    Write-Step "Cleaning previous config (so sync creates fresh OPSX)"
+
+    $cleaned = $false
+
+    # OpenCode: remove opencode.json entirely (sync recreates it with OPSX)
+    $ocJson = Join-Path $HOME ".config\opencode\opencode.json"
+    if (Test-Path $ocJson) {
+        Remove-Item $ocJson -Force
+        $cleaned = $true
+    }
+
+    # OpenCode: remove old sdd-* commands
+    $ocCmds = Join-Path $HOME ".config\opencode\commands"
+    if (Test-Path $ocCmds) {
+        $sddFiles = Get-ChildItem -Path $ocCmds -Filter "sdd-*.md" -ErrorAction SilentlyContinue
+        if ($sddFiles) { $sddFiles | Remove-Item -Force; $cleaned = $true }
+    }
+
+    # Claude Code: remove sdd-orchestrator section marker so sync injects fresh
+    $claudeMd = Join-Path $HOME ".claude\CLAUDE.md"
+    if (Test-Path $claudeMd) {
+        $content = Get-Content -Path $claudeMd -Raw
+        $openMarker = "<!-- gentle-ai:sdd-orchestrator -->"
+        $closeMarker = "<!-- /gentle-ai:sdd-orchestrator -->"
+        if ($content -match [regex]::Escape($openMarker)) {
+            $pattern = "(?s)$([regex]::Escape($openMarker)).*?$([regex]::Escape($closeMarker))\r?\n?"
+            $content = [regex]::Replace($content, $pattern, "")
+            Set-Content -Path $claudeMd -Value $content -NoNewline
+            $cleaned = $true
+        }
+    }
+
+    # Cursor: remove old sdd-* agent files
+    $cursorAgents = Join-Path $HOME ".cursor\agents"
+    if (Test-Path $cursorAgents) {
+        $sddFiles = Get-ChildItem -Path $cursorAgents -Filter "sdd-*.md" -ErrorAction SilentlyContinue
+        if ($sddFiles) { $sddFiles | Remove-Item -Force; $cleaned = $true }
+    }
+
+    if ($cleaned) {
+        Write-Success "Previous config cleaned"
+    } else {
+        Write-Success "No previous config found - clean install"
+    }
+}
+
 function Invoke-Sync {
     Write-Step "Running $BINARY_NAME sync (self-update disabled)"
 
@@ -174,6 +221,7 @@ function Main {
     Show-Banner
     Test-Prerequisites
     Install-FromSource
+    Clear-LegacyConfig
     Invoke-Sync
     Show-Summary
 
