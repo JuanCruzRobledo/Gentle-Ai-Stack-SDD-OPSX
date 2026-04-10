@@ -260,7 +260,54 @@ func Inject(homeDir string, adapter agents.Adapter) (InjectionResult, error) {
 		}
 	}
 
+	// 3. Inject SessionStart hooks for engram (Claude Code only).
+	// These hooks fire at session startup and after compaction, emitting a
+	// context reminder that the model receives as a system-level message.
+	// This is more reliable than CLAUDE.md instructions alone because hooks
+	// execute programmatically via the harness, not at the model's discretion.
+	if adapter.Agent() == model.AgentClaudeCode {
+		settingsPath := adapter.SettingsPath(homeDir)
+		if settingsPath != "" {
+			hookOverlay := engramHooksOverlayJSON()
+			hookWrite, err := mergeJSONFile(settingsPath, hookOverlay)
+			if err != nil {
+				return InjectionResult{}, fmt.Errorf("inject engram hooks: %w", err)
+			}
+			changed = changed || hookWrite.Changed
+			if hookWrite.Changed {
+				files = append(files, settingsPath)
+			}
+		}
+	}
+
 	return InjectionResult{Changed: changed, Files: files}, nil
+}
+
+// engramHooksOverlayJSON returns the settings.json overlay that adds
+// SessionStart hooks for engram. Two matchers:
+//   - "startup" → new conversation
+//   - "compact" → after context compaction (model loses prior context)
+//
+// The hook outputs plain text to stdout which Claude Code injects as
+// context the model sees at the start of the session/post-compaction.
+func engramHooksOverlayJSON() []byte {
+	hook := map[string]any{
+		"hooks": map[string]any{
+			"SessionStart": []any{
+				map[string]any{
+					"matcher": "startup|resume|compact",
+					"hooks": []any{
+						map[string]any{
+							"type": "command",
+							"command": `echo "ENGRAM MEMORY ACTIVE: Call mem_context NOW to load session history. After every decision, discovery, or bugfix, call mem_save. Before ending, call mem_session_summary. This is mandatory — do not skip."`,
+						},
+					},
+				},
+			},
+		},
+	}
+	b, _ := json.MarshalIndent(hook, "", "  ")
+	return append(b, '\n')
 }
 
 // writeCodexInstructionFiles writes the Engram memory protocol and compact prompt
