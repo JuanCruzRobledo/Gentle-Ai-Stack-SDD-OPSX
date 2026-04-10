@@ -300,6 +300,15 @@ function Clear-LegacyConfig {
             $cleaned = $true
             Write-Info "Removed $($sddSkillDirs.Count) old sdd-* skill folders from Claude"
         }
+        # Remove core OPSX skills that are now installed as /opsx:* commands
+        # (they caused duplicates when both skill and command existed)
+        foreach ($dupSkill in @("openspec-explore", "openspec-propose", "openspec-apply-change", "openspec-archive-change")) {
+            $dupPath = Join-Path $claudeSkills $dupSkill
+            if (Test-Path $dupPath) {
+                Remove-Item $dupPath -Recurse -Force
+                $cleaned = $true
+            }
+        }
     }
 
     # Claude Code: remove old flat opsx-*.md command files (replaced by opsx/*.md)

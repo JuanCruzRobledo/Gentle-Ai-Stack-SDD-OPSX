@@ -1738,8 +1738,6 @@ func TestInjectCopiesAllFilesFromSkillDirectory(t *testing.T) {
 		skill string
 		file  string
 	}{
-		{"openspec-apply-change", "SKILL.md"},
-		{"openspec-apply-change", "strict-tdd.md"},
 		{"openspec-verify", "SKILL.md"},
 		{"openspec-verify", "strict-tdd-verify.md"},
 	}
@@ -1769,7 +1767,6 @@ func TestInjectCopiesAllFilesReportedInResult(t *testing.T) {
 
 	skillsDir := filepath.Join(home, ".config", "opencode", "skills")
 	wantPaths := []string{
-		filepath.Join(skillsDir, "openspec-apply-change", "strict-tdd.md"),
 		filepath.Join(skillsDir, "openspec-verify", "strict-tdd-verify.md"),
 	}
 

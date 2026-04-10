@@ -395,9 +395,13 @@ func Inject(homeDir string, adapter agents.Adapter, sddMode model.SDDModeID, opt
 				files = append(files, path)
 			}
 
+			// Core OPSX skills (explore, propose, apply-change, archive-change)
+			// are NOT installed as skills because they have equivalent /opsx:*
+			// commands that would create duplicates in the skills list.
+			// Only helper skills (no corresponding command) are installed.
 			sddSkills := []string{
-				"openspec-init", "openspec-explore", "openspec-propose", "openspec-spec",
-				"openspec-design", "openspec-tasks", "openspec-apply-change", "openspec-verify", "openspec-archive-change",
+				"openspec-init", "openspec-spec",
+				"openspec-design", "openspec-tasks", "openspec-verify",
 				"openspec-onboard", "judgment-day",
 			}
 
@@ -548,7 +552,7 @@ func Inject(homeDir string, adapter agents.Adapter, sddMode model.SDDModeID, opt
 	if adapter.SupportsSkills() {
 		skillDir := adapter.SkillsDir(homeDir)
 		if skillDir != "" {
-			for _, skill := range []string{"openspec-init", "openspec-apply-change", "openspec-verify"} {
+			for _, skill := range []string{"openspec-init", "openspec-verify"} {
 				path := filepath.Join(skillDir, skill, "SKILL.md")
 				info, err := os.Stat(path)
 				if err != nil {

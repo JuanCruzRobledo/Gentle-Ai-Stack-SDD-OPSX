@@ -840,15 +840,14 @@ func componentPaths(homeDir string, selection model.Selection, adapters []agents
 						filepath.Join(skillDir, "_shared", "openspec-convention.md"),
 						filepath.Join(skillDir, "_shared", "sdd-phase-common.md"),
 						filepath.Join(skillDir, "_shared", "skill-resolver.md"),
+						// Core OPSX skills (explore, propose, apply-change, archive-change)
+						// are installed as /opsx:* commands, not as skills.
+						// Only helper skills listed here.
 						filepath.Join(skillDir, "openspec-init", "SKILL.md"),
-						filepath.Join(skillDir, "openspec-explore", "SKILL.md"),
-						filepath.Join(skillDir, "openspec-propose", "SKILL.md"),
 						filepath.Join(skillDir, "openspec-spec", "SKILL.md"),
 						filepath.Join(skillDir, "openspec-design", "SKILL.md"),
 						filepath.Join(skillDir, "openspec-tasks", "SKILL.md"),
-						filepath.Join(skillDir, "openspec-apply-change", "SKILL.md"),
 						filepath.Join(skillDir, "openspec-verify", "SKILL.md"),
-						filepath.Join(skillDir, "openspec-archive-change", "SKILL.md"),
 					)
 				}
 			}
