@@ -56,15 +56,35 @@ Implement tasks from an OpenSpec change.
    - **spec-driven**: proposal, specs, design, tasks
    - Other schemas: follow the contextFiles from CLI output
 
-5. **Show current progress**
+5. **Load domain skills before writing any code**
+
+   Check if project standards were injected into your prompt (a `## Project Standards (auto-resolved)` section). If present, follow those rules — they were pre-resolved by the orchestrator via the Skill Resolver Protocol.
+
+   If NO project standards were injected, self-resolve:
+   1. Check if the project has a skill registry (`.agents/SKILLS.md`, `.atl/skill-registry.md`, or equivalent)
+   2. If found, read it and identify which domain skills match this change based on what the tasks touch
+   3. For each matching skill, read its `SKILL.md` file
+   4. Apply every pattern, convention, and template from loaded skills throughout implementation
+
+   Skill matching rules:
+   - Match by **what the tasks touch** (e.g., backend models, frontend stores, API routes, tests)
+   - If the registry defines "always load" rules (e.g., a skill that applies to ALL backend changes), follow them
+   - Multiple skills can apply simultaneously — load ALL that match
+   - Load BEFORE writing code, not after
+   - If the registry defines conflict resolution rules, follow them
+
+   If no skill registry exists and no standards were injected, skip this step and proceed with implementation using only the context files from step 4.
+
+6. **Show current progress**
 
    Display:
    - Schema being used
    - Progress: "N/M tasks complete"
    - Remaining tasks overview
    - Dynamic instruction from CLI
+   - Domain skills loaded (if any)
 
-6. **Implement tasks (loop until done or blocked)**
+7. **Implement tasks (loop until done or blocked)**
 
    For each pending task:
    - Show which task is being worked on
@@ -79,7 +99,7 @@ Implement tasks from an OpenSpec change.
    - Error or blocker encountered -> report and wait for guidance
    - User interrupts
 
-7. **On completion or pause, show status**
+8. **On completion or pause, show status**
 
    Display:
    - Tasks completed this session

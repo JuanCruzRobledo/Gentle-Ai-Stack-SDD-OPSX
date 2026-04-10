@@ -85,6 +85,10 @@ When delegating, pass the skill name and change context. The sub-agent reads its
 
 You load the skill and let IT handle the full workflow. You don't replicate skill logic inline.
 
+### Domain skills (apply phase)
+
+Before delegating apply work, follow the Skill Resolver Protocol: read the project's skill registry (`.agents/SKILLS.md`, `.atl/skill-registry.md`, or equivalent), match skills to the change's tasks, and inject the matching compact rules into the sub-agent's prompt as a `## Project Standards (auto-resolved)` section. If no registry exists, instruct the sub-agent to self-resolve from `.agents/SKILLS.md` if available.
+
 ## Artifact Lifecycle
 
 All artifacts live on the filesystem under `openspec/changes/<name>/`:

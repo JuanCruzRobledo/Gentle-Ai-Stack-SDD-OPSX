@@ -127,12 +127,20 @@ Execute the `{skill-name}` skill for change "{change-name}".
 ## Project Context
 {Brief tech stack and conventions — from config.yaml or prior engram context}
 
+## Project Standards (auto-resolved)
+{Follow the Skill Resolver Protocol to resolve and inject compact rules here.
+ Read the skill registry, match skills to the change's tasks, and paste the
+ compact rules blocks for each matching skill.
+ If no skill registry exists, omit this section and note it in the prompt so
+ the sub-agent can self-resolve from `.agents/SKILLS.md` if available.}
+
 ## Instructions
 Use the Skill tool to invoke `{skill-name}` with the change name "{change-name}".
 
 Follow the skill's instructions completely. When done, return a summary of:
 - What was accomplished
 - Files created or changed
+- Domain skills loaded and applied
 - Any issues or blockers found
 - Recommended next action
 

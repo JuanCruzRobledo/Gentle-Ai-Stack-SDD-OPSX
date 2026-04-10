@@ -84,6 +84,10 @@ Parse `applyRequires` and `artifacts` to understand what exists and what's neede
 
 Read the skill file at `~/.gemini/antigravity/skills/{skill-name}/SKILL.md` and follow it exactly. You execute the skill yourself — do NOT attempt to delegate OPSX phases to sub-agents.
 
+### Domain skills (apply phase)
+
+Before writing any code during apply, check if the project has a skill registry (`.agents/SKILLS.md` or equivalent). If it exists, read it and identify which domain skills match the change's tasks. Load ALL matching skill SKILL.md files before implementing — they contain project-specific patterns, conventions, and templates that must be followed.
+
 ## Artifact Lifecycle
 
 All artifacts live on the filesystem under `openspec/changes/<name>/`:

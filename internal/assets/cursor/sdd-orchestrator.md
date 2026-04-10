@@ -89,6 +89,10 @@ Parse `applyRequires` and `artifacts` to understand what exists and what's neede
 | "implement", "apply", "write code", "do the tasks" | `openspec-apply-change` |
 | "archive", "close", "done with" | `openspec-archive-change` |
 
+### Domain skills (apply phase)
+
+Before delegating apply work, follow the Skill Resolver Protocol: read the project's skill registry (`.agents/SKILLS.md`, `.atl/skill-registry.md`, or equivalent), match skills to the change's tasks, and inject the matching compact rules into the sub-agent's prompt as a `## Project Standards (auto-resolved)` section. If no registry exists, instruct the sub-agent to self-resolve from `.agents/SKILLS.md` if available.
+
 You load the skill and let IT handle the full workflow. You don't replicate skill logic inline.
 
 ## Artifact Lifecycle
