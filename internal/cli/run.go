@@ -813,8 +813,16 @@ func componentPaths(homeDir string, selection model.Selection, adapters []agents
 				paths = append(paths, adapter.SystemPromptFile(homeDir))
 			}
 			if adapter.SupportsSlashCommands() {
-				for _, command := range sdd.OpenCodeCommands() {
-					paths = append(paths, filepath.Join(adapter.CommandsDir(homeDir), command.Name+".md"))
+				if adapter.Agent() == model.AgentClaudeCode {
+					// Claude uses nested commands: commands/opsx/explore.md → /opsx:explore
+					for _, name := range []string{"explore", "propose", "apply", "archive"} {
+						paths = append(paths, filepath.Join(adapter.CommandsDir(homeDir), "opsx", name+".md"))
+					}
+				} else {
+					// OpenCode uses flat commands: commands/opsx-explore.md → /opsx-explore
+					for _, command := range sdd.OpenCodeCommands() {
+						paths = append(paths, filepath.Join(adapter.CommandsDir(homeDir), command.Name+".md"))
+					}
 				}
 			}
 			if adapter.Agent() == model.AgentOpenCode {
@@ -832,15 +840,15 @@ func componentPaths(homeDir string, selection model.Selection, adapters []agents
 						filepath.Join(skillDir, "_shared", "openspec-convention.md"),
 						filepath.Join(skillDir, "_shared", "sdd-phase-common.md"),
 						filepath.Join(skillDir, "_shared", "skill-resolver.md"),
-						filepath.Join(skillDir, "sdd-init", "SKILL.md"),
-						filepath.Join(skillDir, "sdd-explore", "SKILL.md"),
-						filepath.Join(skillDir, "sdd-propose", "SKILL.md"),
-						filepath.Join(skillDir, "sdd-spec", "SKILL.md"),
-						filepath.Join(skillDir, "sdd-design", "SKILL.md"),
-						filepath.Join(skillDir, "sdd-tasks", "SKILL.md"),
-						filepath.Join(skillDir, "sdd-apply", "SKILL.md"),
-						filepath.Join(skillDir, "sdd-verify", "SKILL.md"),
-						filepath.Join(skillDir, "sdd-archive", "SKILL.md"),
+						filepath.Join(skillDir, "openspec-init", "SKILL.md"),
+						filepath.Join(skillDir, "openspec-explore", "SKILL.md"),
+						filepath.Join(skillDir, "openspec-propose", "SKILL.md"),
+						filepath.Join(skillDir, "openspec-spec", "SKILL.md"),
+						filepath.Join(skillDir, "openspec-design", "SKILL.md"),
+						filepath.Join(skillDir, "openspec-tasks", "SKILL.md"),
+						filepath.Join(skillDir, "openspec-apply-change", "SKILL.md"),
+						filepath.Join(skillDir, "openspec-verify", "SKILL.md"),
+						filepath.Join(skillDir, "openspec-archive-change", "SKILL.md"),
 					)
 				}
 			}

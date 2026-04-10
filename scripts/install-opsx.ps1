@@ -291,6 +291,48 @@ function Clear-LegacyConfig {
         if ($sddFiles) { $sddFiles | Remove-Item -Force; $cleaned = $true }
     }
 
+    # Claude Code: remove old sdd-* skill folders (replaced by openspec-*)
+    $claudeSkills = Join-Path $HOME ".claude\skills"
+    if (Test-Path $claudeSkills) {
+        $sddSkillDirs = Get-ChildItem -Path $claudeSkills -Directory -Filter "sdd-*" -ErrorAction SilentlyContinue
+        if ($sddSkillDirs) {
+            $sddSkillDirs | Remove-Item -Recurse -Force
+            $cleaned = $true
+            Write-Info "Removed $($sddSkillDirs.Count) old sdd-* skill folders from Claude"
+        }
+    }
+
+    # Claude Code: remove old flat opsx-*.md command files (replaced by opsx/*.md)
+    $claudeCommands = Join-Path $HOME ".claude\commands"
+    if (Test-Path $claudeCommands) {
+        $flatCmds = Get-ChildItem -Path $claudeCommands -Filter "opsx-*.md" -ErrorAction SilentlyContinue
+        if ($flatCmds) {
+            $flatCmds | Remove-Item -Force
+            $cleaned = $true
+            Write-Info "Removed $($flatCmds.Count) old flat opsx-*.md command files from Claude"
+        }
+    }
+
+    # All agents: remove old sdd-* skill folders from all known skill dirs
+    $skillDirs = @(
+        (Join-Path $HOME ".config\opencode\skills"),
+        (Join-Path $HOME ".gemini\skills"),
+        (Join-Path $HOME ".gemini\antigravity\skills"),
+        (Join-Path $HOME ".copilot\skills"),
+        (Join-Path $HOME ".codex\skills"),
+        (Join-Path $HOME ".cursor\skills"),
+        (Join-Path $HOME ".codeium\windsurf\skills")
+    )
+    foreach ($dir in $skillDirs) {
+        if (Test-Path $dir) {
+            $sddSkillDirs = Get-ChildItem -Path $dir -Directory -Filter "sdd-*" -ErrorAction SilentlyContinue
+            if ($sddSkillDirs) {
+                $sddSkillDirs | Remove-Item -Recurse -Force
+                $cleaned = $true
+            }
+        }
+    }
+
     if ($cleaned) {
         Write-Success "Previous config cleaned"
     } else {

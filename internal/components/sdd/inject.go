@@ -245,17 +245,41 @@ func Inject(homeDir string, adapter agents.Adapter, sddMode model.SDDModeID, opt
 	if adapter.SupportsSlashCommands() {
 		commandsDir := adapter.CommandsDir(homeDir)
 		if commandsDir != "" {
-			commandEntries, err := fs.ReadDir(assets.FS, "opencode/commands")
+			// Determine the correct embedded commands directory.
+			// Claude has nested commands (claude/commands/opsx/*.md → /opsx:*).
+			// OpenCode has flat commands (opencode/commands/*.md → /opsx-*).
+			embedCommandsDir := sddCommandsAssetDir(adapter.Agent())
+
+			commandEntries, err := fs.ReadDir(assets.FS, embedCommandsDir)
 			if err != nil {
-				return InjectionResult{}, fmt.Errorf("read embedded opencode/commands: %w", err)
+				return InjectionResult{}, fmt.Errorf("read embedded %s: %w", embedCommandsDir, err)
 			}
 
 			for _, entry := range commandEntries {
 				if entry.IsDir() {
+					// Recurse into subdirectories (e.g. claude/commands/opsx/).
+					subDir := embedCommandsDir + "/" + entry.Name()
+					subEntries, subErr := fs.ReadDir(assets.FS, subDir)
+					if subErr != nil {
+						continue
+					}
+					for _, subEntry := range subEntries {
+						if subEntry.IsDir() || !strings.HasSuffix(subEntry.Name(), ".md") {
+							continue
+						}
+						content := assets.MustRead(subDir + "/" + subEntry.Name())
+						path := filepath.Join(commandsDir, entry.Name(), subEntry.Name())
+						writeResult, writeErr := filemerge.WriteFileAtomic(path, []byte(content), 0o644)
+						if writeErr != nil {
+							return InjectionResult{}, writeErr
+						}
+						changed = changed || writeResult.Changed
+						files = append(files, path)
+					}
 					continue
 				}
 
-				content := assets.MustRead("opencode/commands/" + entry.Name())
+				content := assets.MustRead(embedCommandsDir + "/" + entry.Name())
 				path := filepath.Join(commandsDir, entry.Name())
 				writeResult, err := filemerge.WriteFileAtomic(path, []byte(content), 0o644)
 				if err != nil {
@@ -406,38 +430,6 @@ func Inject(homeDir string, adapter agents.Adapter, sddMode model.SDDModeID, opt
 						return InjectionResult{}, err
 					}
 
-					changed = changed || writeResult.Changed
-					files = append(files, path)
-				}
-			}
-		}
-	}
-
-	// 3a-bis. Write OPSX command files (Claude Code slash commands).
-	// Commands are installed to ~/.claude/commands/opsx/ so they appear as
-	// /opsx:explore, /opsx:propose, /opsx:apply, /opsx:archive.
-	if adapter.SupportsSlashCommands() {
-		commandsDir := adapter.CommandsDir(homeDir)
-		if commandsDir != "" {
-			// Determine the embedded commands directory for this adapter.
-			agentID := string(adapter.Agent())
-			embedDir := agentID + "/commands/opsx"
-
-			entries, readDirErr := fs.ReadDir(assets.FS, embedDir)
-			if readDirErr == nil && len(entries) > 0 {
-				for _, entry := range entries {
-					if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
-						continue
-					}
-					content, readErr := assets.Read(embedDir + "/" + entry.Name())
-					if readErr != nil {
-						return InjectionResult{}, fmt.Errorf("read embedded command %q: %w", entry.Name(), readErr)
-					}
-					path := filepath.Join(commandsDir, "opsx", entry.Name())
-					writeResult, err := filemerge.WriteFileAtomic(path, []byte(content), 0o644)
-					if err != nil {
-						return InjectionResult{}, fmt.Errorf("write command %q: %w", path, err)
-					}
 					changed = changed || writeResult.Changed
 					files = append(files, path)
 				}
@@ -806,6 +798,18 @@ func hasSDDOrchestrator(content string) bool {
 		}
 	}
 	return false
+}
+
+// sddCommandsAssetDir returns the embedded asset directory that holds slash
+// command files for the given agent. Claude uses a nested layout (commands/opsx/*.md)
+// while OpenCode uses flat files (commands/*.md).
+func sddCommandsAssetDir(agent model.AgentID) string {
+	switch agent {
+	case model.AgentClaudeCode:
+		return "claude/commands"
+	default:
+		return "opencode/commands"
+	}
 }
 
 // sddOrchestratorAsset returns the embedded asset path for the SDD orchestrator
