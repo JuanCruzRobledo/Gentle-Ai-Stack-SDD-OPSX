@@ -57,10 +57,10 @@ func TestInjectClaudeWritesSectionMarkers(t *testing.T) {
 		t.Fatal("CLAUDE.md missing close marker for sdd-orchestrator")
 	}
 	if !strings.Contains(text, "sub-agent") {
-		t.Fatal("CLAUDE.md missing real SDD orchestrator content (expected 'sub-agent')")
+		t.Fatal("CLAUDE.md missing OPSX orchestrator content (expected 'sub-agent')")
 	}
-	if !strings.Contains(text, "dependency") {
-		t.Fatal("CLAUDE.md missing real SDD orchestrator content (expected 'dependency')")
+	if !strings.Contains(text, "openspec") {
+		t.Fatal("CLAUDE.md missing OPSX orchestrator content (expected 'openspec')")
 	}
 }
 
@@ -225,14 +225,14 @@ func TestInjectOpenCodeWritesCommandFiles(t *testing.T) {
 		t.Fatalf("expected shared SDD convention file %q: %v", sharedPath, err)
 	}
 
-	skillPath := filepath.Join(home, ".config", "opencode", "skills", "sdd-init", "SKILL.md")
+	skillPath := filepath.Join(home, ".config", "opencode", "skills", "openspec-init", "SKILL.md")
 	skillContent, err := os.ReadFile(skillPath)
 	if err != nil {
-		t.Fatalf("ReadFile(sdd-init SKILL.md) error = %v", err)
+		t.Fatalf("ReadFile(openspec-init SKILL.md) error = %v", err)
 	}
 
-	if !strings.Contains(string(skillContent), "sdd-init") {
-		t.Fatal("SDD skill file missing expected content")
+	if !strings.Contains(string(skillContent), "openspec-init") {
+		t.Fatal("OPSX skill file missing expected content")
 	}
 }
 
@@ -379,10 +379,10 @@ func TestInjectGeminiWritesSDDOrchestratorAndSkills(t *testing.T) {
 		t.Fatal("Gemini system prompt missing SDD orchestrator content")
 	}
 
-	// Should also write SDD skill files.
-	skillPath := filepath.Join(home, ".gemini", "skills", "sdd-init", "SKILL.md")
+	// Should also write OPSX skill files.
+	skillPath := filepath.Join(home, ".gemini", "skills", "openspec-init", "SKILL.md")
 	if _, err := os.Stat(skillPath); err != nil {
-		t.Fatalf("expected SDD skill file %q: %v", skillPath, err)
+		t.Fatalf("expected OPSX skill file %q: %v", skillPath, err)
 	}
 }
 
@@ -418,10 +418,10 @@ func TestInjectVSCodeWritesSDDOrchestratorAndSkills(t *testing.T) {
 		t.Fatal("VS Code system prompt missing orchestrator content")
 	}
 
-	// Should also write SDD skill files under ~/.copilot/skills/.
-	skillPath := filepath.Join(home, ".copilot", "skills", "sdd-init", "SKILL.md")
+	// Should also write OPSX skill files under ~/.copilot/skills/.
+	skillPath := filepath.Join(home, ".copilot", "skills", "openspec-init", "SKILL.md")
 	if _, err := os.Stat(skillPath); err != nil {
-		t.Fatalf("expected SDD skill file %q: %v", skillPath, err)
+		t.Fatalf("expected OPSX skill file %q: %v", skillPath, err)
 	}
 
 	sharedPath := filepath.Join(home, ".copilot", "skills", "_shared", "engram-convention.md")
@@ -1022,9 +1022,10 @@ func TestInjectClaudeDeduplicatesBareOrchestratorSection(t *testing.T) {
 
 	text := string(content)
 
-	// Must have exactly ONE "## Agent Teams Orchestrator" heading — no duplication.
-	if count := strings.Count(text, "## Agent Teams Orchestrator"); count != 1 {
-		t.Fatalf("expected 1 Agent Teams Orchestrator heading, got %d\n\ncontent:\n%s", count, text)
+	// After dedup, the bare "Agent Teams Orchestrator" is stripped and replaced
+	// by the OPSX orchestrator in markers. Must have exactly 1 OPSX heading.
+	if count := strings.Count(text, "# OPSX Orchestrator Instructions"); count != 1 {
+		t.Fatalf("expected 1 OPSX Orchestrator heading, got %d\n\ncontent:\n%s", count, text)
 	}
 
 	// The injected marked version must be present.
@@ -1077,8 +1078,8 @@ func TestInjectClaudeDeduplicatesBareOrchestratorAtEndOfFile(t *testing.T) {
 
 	text := string(content)
 
-	if count := strings.Count(text, "## Agent Teams Orchestrator"); count != 1 {
-		t.Fatalf("expected 1 Agent Teams Orchestrator heading, got %d\n\ncontent:\n%s", count, text)
+	if count := strings.Count(text, "# OPSX Orchestrator Instructions"); count != 1 {
+		t.Fatalf("expected 1 OPSX Orchestrator heading, got %d\n\ncontent:\n%s", count, text)
 	}
 	if !strings.Contains(text, "<!-- gentle-ai:sdd-orchestrator -->") {
 		t.Fatal("missing open marker after injection")
@@ -1737,10 +1738,10 @@ func TestInjectCopiesAllFilesFromSkillDirectory(t *testing.T) {
 		skill string
 		file  string
 	}{
-		{"sdd-apply", "SKILL.md"},
-		{"sdd-apply", "strict-tdd.md"},
-		{"sdd-verify", "SKILL.md"},
-		{"sdd-verify", "strict-tdd-verify.md"},
+		{"openspec-apply-change", "SKILL.md"},
+		{"openspec-apply-change", "strict-tdd.md"},
+		{"openspec-verify", "SKILL.md"},
+		{"openspec-verify", "strict-tdd-verify.md"},
 	}
 
 	for _, tt := range tests {
@@ -1768,8 +1769,8 @@ func TestInjectCopiesAllFilesReportedInResult(t *testing.T) {
 
 	skillsDir := filepath.Join(home, ".config", "opencode", "skills")
 	wantPaths := []string{
-		filepath.Join(skillsDir, "sdd-apply", "strict-tdd.md"),
-		filepath.Join(skillsDir, "sdd-verify", "strict-tdd-verify.md"),
+		filepath.Join(skillsDir, "openspec-apply-change", "strict-tdd.md"),
+		filepath.Join(skillsDir, "openspec-verify", "strict-tdd-verify.md"),
 	}
 
 	resultSet := make(map[string]bool, len(result.Files))
@@ -1810,8 +1811,8 @@ func TestInjectClaudeDeduplicatesBareOrchestratorAtBeginning(t *testing.T) {
 	}
 	text := string(content)
 
-	if count := strings.Count(text, "## Agent Teams Orchestrator"); count != 1 {
-		t.Fatalf("expected 1 Agent Teams Orchestrator heading, got %d\n\ncontent:\n%s", count, text)
+	if count := strings.Count(text, "# OPSX Orchestrator Instructions"); count != 1 {
+		t.Fatalf("expected 1 OPSX Orchestrator heading, got %d\n\ncontent:\n%s", count, text)
 	}
 	if !strings.Contains(text, "<!-- gentle-ai:sdd-orchestrator -->") {
 		t.Fatal("missing open marker after injection")
@@ -1853,8 +1854,8 @@ func TestInjectClaudeDeduplicatesFileWithOnlyBareOrchestrator(t *testing.T) {
 	text := string(content)
 
 	// Should have exactly one orchestrator heading (the injected one).
-	if count := strings.Count(text, "## Agent Teams Orchestrator"); count != 1 {
-		t.Fatalf("expected 1 Agent Teams Orchestrator heading, got %d\n\ncontent:\n%s", count, text)
+	if count := strings.Count(text, "# OPSX Orchestrator Instructions"); count != 1 {
+		t.Fatalf("expected 1 OPSX Orchestrator heading, got %d\n\ncontent:\n%s", count, text)
 	}
 	// Must have markers.
 	if !strings.Contains(text, "<!-- gentle-ai:sdd-orchestrator -->") {
@@ -1905,8 +1906,10 @@ func TestInjectClaudeDeduplicatesBareOrchestratorIsIdempotent(t *testing.T) {
 	}
 	text := string(content)
 
-	if count := strings.Count(text, "## Agent Teams Orchestrator"); count != 1 {
-		t.Fatalf("expected 1 Agent Teams Orchestrator heading after 2 injects, got %d\n\ncontent:\n%s", count, text)
+	// After dedup + inject, the bare "Agent Teams Orchestrator" is replaced by
+	// the OPSX orchestrator within markers. Verify exactly 1 OPSX heading.
+	if count := strings.Count(text, "# OPSX Orchestrator Instructions"); count != 1 {
+		t.Fatalf("expected 1 OPSX Orchestrator heading after 2 injects, got %d\n\ncontent:\n%s", count, text)
 	}
 }
 
@@ -2342,7 +2345,7 @@ func TestSDDOrchestratorAssetSelection(t *testing.T) {
 		{agent: model.AgentCodex, want: "codex/sdd-orchestrator.md"},
 		{agent: model.AgentWindsurf, want: "windsurf/sdd-orchestrator.md"},
 		{agent: model.AgentCursor, want: "cursor/sdd-orchestrator.md"},
-		{agent: model.AgentClaudeCode, want: "generic/sdd-orchestrator.md"},
+		{agent: model.AgentClaudeCode, want: "claude/sdd-orchestrator.md"},
 		{agent: model.AgentOpenCode, want: "generic/sdd-orchestrator.md"},
 		{agent: model.AgentVSCodeCopilot, want: "generic/sdd-orchestrator.md"},
 	}
@@ -2435,10 +2438,10 @@ func TestInjectCodexWritesSDDOrchestratorAndSkills(t *testing.T) {
 		t.Fatal("agents.md contains Gemini-specific paths — wrong asset was injected")
 	}
 
-	// Should also write SDD skill files.
-	skillPath := filepath.Join(home, ".codex", "skills", "sdd-init", "SKILL.md")
+	// Should also write OPSX skill files.
+	skillPath := filepath.Join(home, ".codex", "skills", "openspec-init", "SKILL.md")
 	if _, err := os.Stat(skillPath); err != nil {
-		t.Fatalf("expected SDD skill file %q: %v", skillPath, err)
+		t.Fatalf("expected OPSX skill file %q: %v", skillPath, err)
 	}
 
 	// Shared files should also be written.
@@ -2535,9 +2538,7 @@ func TestInjectOpenCodeMultiModeWithPreExistingMinimalConfig(t *testing.T) {
 	if _, ok := agentMap["sdd-orchestrator"]; !ok {
 		t.Fatal("missing sdd-orchestrator after merge with pre-existing config")
 	}
-	if _, ok := agentMap["sdd-apply"]; !ok {
-		t.Fatal("missing sdd-apply after merge with pre-existing config — post-check regression")
-	}
+	// OPSX: overlay only contains sdd-orchestrator (no sdd-* sub-agents).
 }
 
 // TestInjectOpenCodeMultiModeWithPreExistingFullConfig verifies that a
@@ -2604,14 +2605,9 @@ func TestInjectOpenCodeMultiModeWithPreExistingFullConfig(t *testing.T) {
 		t.Fatal("opencode.json missing agent key after merge")
 	}
 
-	// All 10 multi-mode agents must be present.
-	for _, agentName := range []string{
-		"sdd-orchestrator", "sdd-init", "sdd-explore", "sdd-propose",
-		"sdd-spec", "sdd-design", "sdd-tasks", "sdd-apply", "sdd-verify", "sdd-archive",
-	} {
-		if _, ok := agentMap[agentName]; !ok {
-			t.Fatalf("missing agent %q after merge with full pre-existing config", agentName)
-		}
+	// OPSX: only sdd-orchestrator should be in the overlay (no legacy sub-agents).
+	if _, ok := agentMap["sdd-orchestrator"]; !ok {
+		t.Fatal("missing sdd-orchestrator after merge with full pre-existing config")
 	}
 }
 

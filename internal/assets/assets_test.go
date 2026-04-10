@@ -44,16 +44,22 @@ func TestAllEmbeddedAssetsAreReadable(t *testing.T) {
 		"cursor/agents/sdd-verify.md",
 		"cursor/agents/sdd-archive.md",
 
-		// SDD skills
-		"skills/sdd-init/SKILL.md",
-		"skills/sdd-apply/SKILL.md",
-		"skills/sdd-archive/SKILL.md",
-		"skills/sdd-design/SKILL.md",
-		"skills/sdd-explore/SKILL.md",
-		"skills/sdd-propose/SKILL.md",
-		"skills/sdd-spec/SKILL.md",
-		"skills/sdd-tasks/SKILL.md",
-		"skills/sdd-verify/SKILL.md",
+		// Claude OPSX commands
+		"claude/commands/opsx/explore.md",
+		"claude/commands/opsx/propose.md",
+		"claude/commands/opsx/apply.md",
+		"claude/commands/opsx/archive.md",
+
+		// OPSX skills
+		"skills/openspec-init/SKILL.md",
+		"skills/openspec-apply-change/SKILL.md",
+		"skills/openspec-archive-change/SKILL.md",
+		"skills/openspec-design/SKILL.md",
+		"skills/openspec-explore/SKILL.md",
+		"skills/openspec-propose/SKILL.md",
+		"skills/openspec-spec/SKILL.md",
+		"skills/openspec-tasks/SKILL.md",
+		"skills/openspec-verify/SKILL.md",
 		"skills/skill-registry/SKILL.md",
 		"skills/_shared/persistence-contract.md",
 		"skills/_shared/engram-convention.md",

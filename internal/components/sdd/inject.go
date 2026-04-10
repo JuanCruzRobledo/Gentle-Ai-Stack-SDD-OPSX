@@ -372,9 +372,9 @@ func Inject(homeDir string, adapter agents.Adapter, sddMode model.SDDModeID, opt
 			}
 
 			sddSkills := []string{
-				"sdd-init", "sdd-explore", "sdd-propose", "sdd-spec",
-				"sdd-design", "sdd-tasks", "sdd-apply", "sdd-verify", "sdd-archive",
-				"sdd-onboard", "judgment-day",
+				"openspec-init", "openspec-explore", "openspec-propose", "openspec-spec",
+				"openspec-design", "openspec-tasks", "openspec-apply-change", "openspec-verify", "openspec-archive-change",
+				"openspec-onboard", "judgment-day",
 			}
 
 			for _, skill := range sddSkills {
@@ -406,6 +406,38 @@ func Inject(homeDir string, adapter agents.Adapter, sddMode model.SDDModeID, opt
 						return InjectionResult{}, err
 					}
 
+					changed = changed || writeResult.Changed
+					files = append(files, path)
+				}
+			}
+		}
+	}
+
+	// 3a-bis. Write OPSX command files (Claude Code slash commands).
+	// Commands are installed to ~/.claude/commands/opsx/ so they appear as
+	// /opsx:explore, /opsx:propose, /opsx:apply, /opsx:archive.
+	if adapter.SupportsSlashCommands() {
+		commandsDir := adapter.CommandsDir(homeDir)
+		if commandsDir != "" {
+			// Determine the embedded commands directory for this adapter.
+			agentID := string(adapter.Agent())
+			embedDir := agentID + "/commands/opsx"
+
+			entries, readDirErr := fs.ReadDir(assets.FS, embedDir)
+			if readDirErr == nil && len(entries) > 0 {
+				for _, entry := range entries {
+					if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
+						continue
+					}
+					content, readErr := assets.Read(embedDir + "/" + entry.Name())
+					if readErr != nil {
+						return InjectionResult{}, fmt.Errorf("read embedded command %q: %w", entry.Name(), readErr)
+					}
+					path := filepath.Join(commandsDir, "opsx", entry.Name())
+					writeResult, err := filemerge.WriteFileAtomic(path, []byte(content), 0o644)
+					if err != nil {
+						return InjectionResult{}, fmt.Errorf("write command %q: %w", path, err)
+					}
 					changed = changed || writeResult.Changed
 					files = append(files, path)
 				}
@@ -524,7 +556,7 @@ func Inject(homeDir string, adapter agents.Adapter, sddMode model.SDDModeID, opt
 	if adapter.SupportsSkills() {
 		skillDir := adapter.SkillsDir(homeDir)
 		if skillDir != "" {
-			for _, skill := range []string{"sdd-init", "sdd-apply", "sdd-verify"} {
+			for _, skill := range []string{"openspec-init", "openspec-apply-change", "openspec-verify"} {
 				path := filepath.Join(skillDir, skill, "SKILL.md")
 				info, err := os.Stat(path)
 				if err != nil {
@@ -780,6 +812,8 @@ func hasSDDOrchestrator(content string) bool {
 // content based on the agent. Agent-specific assets take priority; generic is fallback.
 func sddOrchestratorAsset(agent model.AgentID) string {
 	switch agent {
+	case model.AgentClaudeCode:
+		return "claude/sdd-orchestrator.md"
 	case model.AgentGeminiCLI:
 		return "gemini/sdd-orchestrator.md"
 	case model.AgentCodex:
